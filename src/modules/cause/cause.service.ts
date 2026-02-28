@@ -1,6 +1,5 @@
-import { Cause, PrismaClient } from "../../../generated/prisma/client";
-import { Prisma } from "../../../generated/prisma/client";
-import { CauseRepository, ICauseRepository } from "./cause.repository";
+import { Cause } from "../../../generated/prisma/client";
+import { ICauseRepository } from "./cause.repository";
 import { CreateCauseSchema, UpdateCauseDTO } from "./cause.schema";
 
 
