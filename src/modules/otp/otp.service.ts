@@ -54,6 +54,7 @@ export class OtpService {
     otp: string,
     userId: string,
   ): Promise<{ success: boolean; reason?: string }> {
+    
     const identifier = this.identifierFor(email);
 
     const record = await this.prisma.verification.findFirst({
