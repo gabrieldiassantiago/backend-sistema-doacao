@@ -68,6 +68,8 @@ model Cause {
   donations   Donation[]
   imageUrl    String?
   createdAt DateTime @default(now())
+  //flag pra controlar se bateu a meta
+  isGoalReached Boolean @default(false)
   updatedAt DateTime @updatedAt
 }
 
