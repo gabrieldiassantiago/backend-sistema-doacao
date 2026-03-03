@@ -97,6 +97,7 @@ model UserBadge {
   id       String   @id @default(uuid())
   userId   String
   badgeKey BadgeKey
+  imageUrl String //em breve isso
   earnedAt DateTime @default(now())
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
