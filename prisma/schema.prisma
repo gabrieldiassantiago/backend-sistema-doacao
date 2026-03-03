@@ -21,6 +21,7 @@ model User {
   xpPoints      Int        @default(0)
   createdCauses Cause[]    @relation("CreatedCauses")
   donations     Donation[]
+  badges        UserBadge[]
   passwordHash  String? 
   accounts      Account[]
 
@@ -70,16 +71,38 @@ model Cause {
   updatedAt DateTime @updatedAt
 }
 
+enum BadgeKey {
+  FIRST_DONATION
+  DONOR_5
+  DONOR_10
+  DONOR_20
+  TOTAL_500
+  TOTAL_1000
+}
+
 model Donation {
-  id      String  @id @default(uuid())
-  amount  Float
-  message String?
-  userId  String
-  user    User    @relation(fields: [userId], references: [id])
-  causeId String
-  cause   Cause   @relation(fields: [causeId], references: [id])
+  id        String  @id @default(uuid())
+  amount    Float
+  message   String?
+  xpEarned  Int     @default(0)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  causeId   String
+  cause     Cause   @relation(fields: [causeId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+model UserBadge {
+  id       String   @id @default(uuid())
+  userId   String
+  badgeKey BadgeKey
+  earnedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeKey])
+  @@index([userId])
+  @@map("user_badge")
 }
 
 model Account {
