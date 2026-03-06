@@ -87,7 +87,7 @@ export class DonationRepository implements IDonationRepository {
 
       if (newBadgeKeys.length > 0) {
         await tx.userBadge.createMany({
-          data:            newBadgeKeys.map((badgeKey) => ({ userId: data.userId, badgeKey })),
+          data:            newBadgeKeys.map((badgeKey) => ({ userId: data.userId, badgeKey, imageUrl: null })),
           skipDuplicates:  true,
         });
       }

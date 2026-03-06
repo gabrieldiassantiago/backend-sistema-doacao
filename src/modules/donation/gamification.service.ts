@@ -71,7 +71,6 @@ export const BADGE_META: Record<BadgeKey, BadgeMeta> = {
   },
 };
 
-
 /**
  * Retorna as informações do nível atual para uma quantidade de XP fornecida.
  */
