@@ -19,9 +19,12 @@ model User {
   updatedAt     DateTime   @updatedAt
   sessions      Session[]
   xpPoints      Int        @default(0)
+  balance       Float      @default(0)
   createdCauses Cause[]    @relation("CreatedCauses")
   donations     Donation[]
   badges        UserBadge[]
+  payments      Payment[]
+  withdrawals   Withdrawal[]
   passwordHash  String? 
   accounts      Account[]
 
@@ -66,11 +69,44 @@ model Cause {
   authorId    String
   author      User       @relation("CreatedCauses", fields: [authorId], references: [id])
   donations   Donation[]
+  payments    Payment[]
+  withdrawals Withdrawal[]
   imageUrl    String?
-  createdAt DateTime @default(now())
+  balance     Float     @default(0)
+  createdAt   DateTime  @default(now())
   //flag pra controlar se bateu a meta
   isGoalReached Boolean @default(false)
-  updatedAt DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  mpPaymentId  String?       @unique
+  status       PaymentStatus @default(PENDING)
+  amount       Float
+  message      String?
+  payerEmail   String
+  qrCode       String?
+  qrCodeBase64 String?
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  causeId      String
+  cause        Cause         @relation(fields: [causeId], references: [id])
+  donationId   String?       @unique
+  donation     Donation?     @relation(fields: [donationId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([causeId])
+  @@map("payment")
 }
 
 enum BadgeKey {
@@ -91,7 +127,7 @@ model Donation {
   user      User    @relation(fields: [userId], references: [id])
   causeId   String
   cause     Cause   @relation(fields: [causeId], references: [id])
-
+  payment   Payment?
   createdAt DateTime @default(now())
 }
 
@@ -99,13 +135,39 @@ model UserBadge {
   id       String   @id @default(uuid())
   userId   String
   badgeKey BadgeKey
-  imageUrl String //em breve isso
+  imageUrl String? //em breve isso
   earnedAt DateTime @default(now())
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeKey])
   @@index([userId])
   @@map("user_badge")
+}
+
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Withdrawal {
+  id           String           @id @default(uuid())
+  causeId      String
+  cause        Cause            @relation(fields: [causeId], references: [id])
+  userId       String
+  user         User             @relation(fields: [userId], references: [id])
+  amount       Float
+  pixKey       String
+  status       WithdrawalStatus @default(PENDING)
+  mpTransferId String?
+  failReason   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([causeId])
+  @@index([userId])
+  @@map("withdrawal")
 }
 
 model Account {
