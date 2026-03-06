@@ -42,6 +42,7 @@ export class DonationService implements IDonationService {
   async create(data: CreateDonationData): Promise<DonationResult> {
     // valida a causa e o usuário
     const cause = await this.causeRepository.findById(data.causeId);
+
     if (!cause) throw new Error("Cause not found");
     if (cause.status !== "ACTIVE") throw new Error("Cause is not accepting donations");
 
