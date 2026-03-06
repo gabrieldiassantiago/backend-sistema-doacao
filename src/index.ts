@@ -5,6 +5,8 @@ import { causeController } from "./modules/cause/cause.controller";
 import { userController } from "./modules/user/user.controller";
 import { donationController } from "./modules/donation/donation.controller";
 import { otpController } from "./modules/otp/otp.controller";
+import { paymentController } from "./modules/payment/payment.controller";
+import { withdrawalController } from "./modules/withdrawal/withdrawal.controller";
 import { OtpService } from "./modules/otp/otp.service";
 import { prisma } from "./lib/prisma";
 import cron from "@elysiajs/cron";
@@ -37,6 +39,8 @@ const app = new Elysia()
   .use(causeController)
   .use(userController)
   .use(donationController)
+  .use(paymentController)
+  .use(withdrawalController)
   .use(otpController)
 
 
