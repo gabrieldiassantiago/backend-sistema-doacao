@@ -1,15 +1,13 @@
 import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
-import { CauseService } from "./cause.service";
-import { CauseRepository } from "./cause.repository";
-import { prisma } from "../../lib/prisma";
+import { container } from "../../container";
 import {
   CauseParamsSchema,
   CreateCauseSchema,
   UpdateCauseSchema,
 } from "./cause.schema";
 
-const causeService = new CauseService(new CauseRepository(prisma));
+const { causeService } = container;
 
 export const causeController = new Elysia({ prefix: "/causes" })
 

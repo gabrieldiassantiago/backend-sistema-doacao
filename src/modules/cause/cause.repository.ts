@@ -1,13 +1,6 @@
 import { Cause } from "../../../generated/prisma/browser";
 import { Prisma, PrismaClient } from "../../../generated/prisma/client";
-
-export interface ICauseRepository {
-  create(data: Prisma.CauseUncheckedCreateInput): Promise<Cause>;
-  findById(id: string): Promise<Cause | null>;
-  findActiveCauses(skip?: number, take?: number): Promise<Cause[]>;
-  update(id: string, data: Prisma.CauseUpdateInput): Promise<Cause>;
-  delete(id: string): Promise<Cause>;
-}
+import type { ICauseRepository } from "./cause.types";
 
 export class CauseRepository implements ICauseRepository {
   constructor(private readonly prisma: PrismaClient) {}

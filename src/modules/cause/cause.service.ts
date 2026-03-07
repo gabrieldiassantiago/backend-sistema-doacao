@@ -1,15 +1,6 @@
 import { Cause } from "../../../generated/prisma/client";
-import { ICauseRepository } from "./cause.repository";
-import { CreateCauseSchema, UpdateCauseDTO } from "./cause.schema";
-
-
-export interface ICauseService {
-    create(data: CreateCauseSchema, authorId: string): Promise<Cause>;
-    getCauseById(id: string): Promise<Cause | null>;
-    getActiveCauses(skip?: number, take?: number): Promise<Cause[]>;
-    updateCause(id: string, data: UpdateCauseDTO, userId: string): Promise<Cause>;
-    deleteCause(id: string, userId: string): Promise<Cause>;
-}
+import type { ICauseRepository, ICauseService } from "./cause.types";
+import type { CreateCauseSchema, UpdateCauseDTO } from "./cause.schema";
 
 export class CauseService implements ICauseService {
     constructor(private readonly causeRepository: ICauseRepository) {}
