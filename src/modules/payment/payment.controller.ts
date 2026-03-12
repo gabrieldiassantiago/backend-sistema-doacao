@@ -1,20 +1,9 @@
 import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
-import { PaymentService } from "./payment.service";
-import { PaymentRepository } from "./payment.repository";
-import { CauseRepository } from "../cause/cause.repository";
-import { UserRepository } from "../user/user.repository";
-import { DonationRepository } from "../donation/donation.repository";
-import { prisma } from "../../lib/prisma";
+import { container } from "../../container";
 import { InitiatePaymentSchema, WebhookSchema } from "./payment.schema";
 
-const paymentService = new PaymentService(
-  new PaymentRepository(prisma),
-  new CauseRepository(prisma),
-  new UserRepository(prisma),
-  new DonationRepository(prisma),
-  prisma,
-);
+const { paymentService } = container;
 
 export const paymentController = new Elysia({ prefix: "/payments" })
   .use(betterAuthMiddleware)

@@ -1,49 +1,22 @@
-import { PrismaClient } from "../../../generated/prisma/client";
-import { ICauseRepository } from "../cause/cause.repository";
-import { IDonationRepository } from "../donation/donation.repository";
-import { IUserRepository } from "../user/user.repository";
-import {
-  BADGE_META,
-  BadgeMeta,
-  LevelInfo,
-  computeLevel,
-  computeNewBadges,
-  computeXpForDonation,
-} from "../donation/gamification.service";
+import type { ICauseRepository } from "../cause/cause.types";
+import type { IDonationService } from "../donation/donation.types";
+import type { IUserRepository } from "../user/user.types";
 import { mpPaymentClient } from "../../lib/mercadopago";
-import { IPaymentRepository } from "./payment.repository";
-import { InitiatePaymentDTO } from "./payment.schema";
+import type {
+  InitiatePaymentResult,
+  IPaymentRepository,
+  IPaymentService,
+  WebhookPayload,
+  WebhookResult,
+} from "./payment.types";
+import type { InitiatePaymentDTO } from "./payment.schema";
 
-export type InitiatePaymentResult = {
-  paymentId:    string;
-  qrCode:       string;
-  qrCodeBase64: string;
-  amount:       number;
-  causeTitle:   string;
-  status:       string;
-};
-
-export type WebhookPayload = {
-  type?:   string;
-  action?: string;
-  data?:   { id: string };
-};
-
-export type WebhookResult = {
-  processed: boolean;
-  reason?:   string;
-  xpEarned?: number;
-  newBadges?: BadgeMeta[];
-  level?:     LevelInfo;
-};
-
-export class PaymentService {
+export class PaymentService implements IPaymentService {
   constructor(
-    private readonly paymentRepository: IPaymentRepository,
-    private readonly causeRepository:   ICauseRepository,
-    private readonly userRepository:    IUserRepository,
-    private readonly donationRepository: IDonationRepository,
-    private readonly prisma:            PrismaClient,
+    private readonly paymentRepository:  IPaymentRepository,
+    private readonly causeRepository:    ICauseRepository,
+    private readonly userRepository:     IUserRepository,
+    private readonly donationService:    IDonationService,
   ) {}
 
   async initiatePayment(
@@ -51,9 +24,12 @@ export class PaymentService {
     userId:     string,
     payerEmail: string,
   ): Promise<InitiatePaymentResult> {
+
     const cause = await this.causeRepository.findById(data.causeId);
-    if (!cause)                   throw new Error("Cause not found");
-    if (cause.status !== "ACTIVE") throw new Error("Cause is not accepting donations");
+    
+    if (!cause)                   throw new Error("Causa não encontrada");
+
+    if (cause.status !== "ACTIVE") throw new Error("Causa não está aceitando doações");
 
     // Cria o Payment no banco com status PENDING antes de chamar o MP
     const payment = await this.paymentRepository.create({
@@ -72,7 +48,7 @@ export class PaymentService {
         payer:              { email: payerEmail },
         description:        `Doação para: ${cause.title}`,
         external_reference: payment.id,
-        notification_url:   `${process.env.APP_URL ?? "http://localhost:3000"}/payments/webhook`,
+        notification_url:   'https://e114-2804-14c-418f-81fc-6e8a-b3ca-3bd4-d6b4.ngrok-free.app/payments/webhook', // URL do webhook para receber notificações do MP
       },
       requestOptions: { idempotencyKey: payment.id },
     });
@@ -133,65 +109,22 @@ export class PaymentService {
     }
 
     const payment = await this.paymentRepository.findByMpId(mpPaymentId);
-    if (!payment)                   return { processed: false, reason: "payment_not_found" };
+    if (!payment)                      return { processed: false, reason: "payment_not_found" };
     if (payment.status === "APPROVED") return { processed: false, reason: "already_processed" };
 
-    // Calcula XP e badges com base no estado atual do usuário
-    const stats = await this.donationRepository.getUserStats(payment.userId);
-    const donationCountAfter = stats.donationCount + 1;
-    const totalDonatedAfter  = stats.totalDonated  + payment.amount;
-
-    const xpEarned    = computeXpForDonation(payment.amount, donationCountAfter);
-    const newBadgeKeys = computeNewBadges(donationCountAfter, totalDonatedAfter, stats.earnedBadgeKeys);
-
-    await this.prisma.$transaction(async (tx) => {
-      const donation = await tx.donation.create({
-        data: {
-          amount:   payment.amount,
-          message:  payment.message,
-          userId:   payment.userId,
-          causeId:  payment.causeId,
-          xpEarned,
-        },
-      });
-
-      await tx.cause.update({
-        where: { id: payment.causeId },
-        data:  {
-          raised:   { increment: payment.amount },
-          balance:  { increment: payment.amount },
-        },
-      });
-
-      await tx.user.update({
-        where: { id: payment.userId },
-        data:  {
-          xpPoints: { increment: xpEarned },
-          balance:  { increment: payment.amount },
-        },
-      });
-
-      if (newBadgeKeys.length > 0) {
-        await tx.userBadge.createMany({
-          data:           newBadgeKeys.map((badgeKey) => ({ userId: payment.userId, badgeKey, imageUrl: null })),
-          skipDuplicates: true,
-        });
-      }
-
-      await tx.payment.update({
-        where: { id: payment.id },
-        data:  { status: "APPROVED", donationId: donation.id },
-      });
+    const result = await this.donationService.createFromPayment({
+      id:      payment.id,
+      amount:  payment.amount,
+      message: payment.message,
+      userId:  payment.userId,
+      causeId: payment.causeId,
     });
-
-    const updatedUser = await this.userRepository.findById(payment.userId);
-    const currentXp   = updatedUser?.xpPoints ?? 0;
 
     return {
       processed: true,
-      xpEarned,
-      newBadges: newBadgeKeys.map((k) => BADGE_META[k]),
-      level:     computeLevel(currentXp),
+      xpEarned:  result.xpEarned,
+      newBadges: result.newBadges,
+      level:     result.level,
     };
   }
 

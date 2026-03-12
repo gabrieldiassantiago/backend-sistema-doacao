@@ -1,16 +1,9 @@
 import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
-import { WithdrawalService } from "./withdrawal.service";
-import { WithdrawalRepository } from "./withdrawal.repository";
-import { CauseRepository } from "../cause/cause.repository";
-import { prisma } from "../../lib/prisma";
+import { container } from "../../container";
 import { CreateWithdrawalSchema, WithdrawalParamsSchema } from "./withdrawal.schema";
 
-const withdrawalService = new WithdrawalService(
-  new WithdrawalRepository(prisma),
-  new CauseRepository(prisma),
-  prisma,
-);
+const { withdrawalService } = container;
 
 export const withdrawalController = new Elysia({ prefix: "/withdrawals" })
   .use(betterAuthMiddleware)

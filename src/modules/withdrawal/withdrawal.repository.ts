@@ -1,19 +1,5 @@
 import { PrismaClient, WithdrawalStatus } from "../../../generated/prisma/client";
-
-export type CreateWithdrawalData = {
-  causeId: string;
-  userId:  string;
-  amount:  number;
-  pixKey:  string;
-};
-
-export interface IWithdrawalRepository {
-  create(data: CreateWithdrawalData): Promise<any>;
-  findById(id: string): Promise<any | null>;
-  findByCause(causeId: string, skip: number, take: number): Promise<any[]>;
-  findByUser(userId: string, skip: number, take: number): Promise<any[]>;
-  updateStatus(id: string, status: WithdrawalStatus, extra?: { mpTransferId?: string; failReason?: string }): Promise<any>;
-}
+import type { CreateWithdrawalData, IWithdrawalRepository } from "./withdrawal.types";
 
 const withdrawalInclude = {
   cause: { select: { id: true, title: true, imageUrl: true } },

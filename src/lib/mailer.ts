@@ -17,12 +17,16 @@ export async function sendOTPEmail(
     React.createElement(OTPEmail, { otp, userName }),
   );
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to: [to],
     subject: "🔐 Código de verificação de email",
     html,
   });
+
+  if (error) {
+    throw new Error(`Falha ao enviar email: ${error.message}`);
+  }
 }
 
 export async function sendDonationConfirmationEmail(
@@ -40,10 +44,14 @@ export async function sendDonationConfirmationEmail(
     React.createElement(DonationConfirmationEmail, params),
   );
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to: [to],
     subject: "💚 Sua doação foi confirmada!",
     html,
   });
+
+  if (error) {
+    throw new Error(`Falha ao enviar email: ${error.message}`);
+  }
 }

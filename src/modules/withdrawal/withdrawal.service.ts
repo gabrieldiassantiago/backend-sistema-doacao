@@ -1,18 +1,9 @@
 import { PrismaClient } from "../../../generated/prisma/client";
-import { ICauseRepository } from "../cause/cause.repository";
-import { IWithdrawalRepository } from "./withdrawal.repository";
-import { CreateWithdrawalDTO } from "./withdrawal.schema";
+import type { ICauseRepository } from "../cause/cause.types";
+import type { IWithdrawalRepository, IWithdrawalService, WithdrawalResult } from "./withdrawal.types";
+import type { CreateWithdrawalDTO } from "./withdrawal.schema";
 
-export type WithdrawalResult = {
-  id:          string;
-  status:      string;
-  amount:      number;
-  pixKey:      string;
-  causeTitle:  string;
-  mpTransferId?: string;
-};
-
-export class WithdrawalService {
+export class WithdrawalService implements IWithdrawalService {
   constructor(
     private readonly withdrawalRepository: IWithdrawalRepository,
     private readonly causeRepository:      ICauseRepository,

@@ -1,30 +1,10 @@
 import { PrismaClient } from "../../../generated/prisma/client";
-
-export type CreatePaymentData = {
-  amount:      number;
-  message?:    string;
-  userId:      string;
-  causeId:     string;
-  payerEmail:  string;
-};
-
-export type PaymentStatusValue = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
-
-export type PaymentUpdate = {
-  mpPaymentId?:  string;
-  qrCode?:       string;
-  qrCodeBase64?: string;
-  donationId?:   string;
-};
-
-export interface IPaymentRepository {
-  create(data: CreatePaymentData): Promise<any>;
-  findById(id: string): Promise<any | null>;
-  findByMpId(mpPaymentId: string): Promise<any | null>;
-  updateStatus(id: string, status: PaymentStatusValue, extra?: PaymentUpdate): Promise<any>;
-  findByUser(userId: string, skip: number, take: number): Promise<any[]>;
-  findByCause(causeId: string, skip: number, take: number): Promise<any[]>;
-}
+import type {
+  CreatePaymentData,
+  IPaymentRepository,
+  PaymentStatusValue,
+  PaymentUpdate,
+} from "./payment.types";
 
 export class PaymentRepository implements IPaymentRepository {
   constructor(private readonly prisma: PrismaClient) {}

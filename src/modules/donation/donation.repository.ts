@@ -1,59 +1,11 @@
-import { BadgeKey, Donation, PrismaClient } from "../../../generated/prisma/client";
-
-export type DonationWithRelations = Donation & {
-  cause: { id: string; title: string; imageUrl: string | null };
-  user:  { id: string; name: string; image: string | null };
-};
-
-export type UserDonationStats = {
-  donationCount:    number;
-  totalDonated:     number;
-  earnedBadgeKeys:  BadgeKey[];
-};
-
-export type LeaderboardEntry = {
-  rank:          number;
-  id:            string;
-  name:          string;
-  image:         string | null;
-  xpPoints:      number;
-  donationCount: number;
-  totalDonated:  number;
-};
-
-export type CreateDonationData = {
-  amount:   number;
-  message?: string;
-  userId:   string;
-  causeId:  string;
-};
-
-export interface IDonationRepository {
-  createWithGamification(
-    data:          CreateDonationData,
-    xpEarned:      number,
-    newBadgeKeys:  BadgeKey[],
-  ): Promise<DonationWithRelations>;
-
-  findById(id: string): Promise<DonationWithRelations | null>;
-
-  findByUser(
-    userId: string,
-    skip:   number,
-    take:   number,
-  ): Promise<DonationWithRelations[]>;
-
-  findByCause(
-    causeId: string,
-    skip:    number,
-    take:    number,
-  ): Promise<DonationWithRelations[]>;
-
-  getUserStats(userId: string): Promise<UserDonationStats>;
-
-  getLeaderboard(take: number): Promise<LeaderboardEntry[]>;
-}
-
+import { BadgeKey, PrismaClient } from "../../../generated/prisma/client";
+import type {
+  CreateDonationData,
+  DonationWithRelations,
+  IDonationRepository,
+  LeaderboardEntry,
+  UserDonationStats,
+} from "./donation.types";
 
 const donationInclude = {
   cause: { select: { id: true, title: true, imageUrl: true } },
@@ -68,6 +20,7 @@ export class DonationRepository implements IDonationRepository {
     xpEarned:     number,
     newBadgeKeys: BadgeKey[],
   ): Promise<DonationWithRelations> {
+    
     return this.prisma.$transaction(async (tx) => {
 
       const donation = await tx.donation.create({
@@ -91,6 +44,50 @@ export class DonationRepository implements IDonationRepository {
           skipDuplicates:  true,
         });
       }
+
+      return donation as DonationWithRelations;
+    });
+  }
+
+  async createWithGamificationAndPayment(
+    data:         CreateDonationData,
+    xpEarned:     number,
+    newBadgeKeys: BadgeKey[],
+    paymentId:    string,
+  ): Promise<DonationWithRelations> {
+    return this.prisma.$transaction(async (tx) => {
+      const donation = await tx.donation.create({
+        data:    { ...data, xpEarned },
+        include: donationInclude,
+      });
+
+      await tx.cause.update({
+        where: { id: data.causeId },
+        data:  {
+          raised:  { increment: data.amount },
+          balance: { increment: data.amount },
+        },
+      });
+
+      await tx.user.update({
+        where: { id: data.userId },
+        data:  {
+          xpPoints: { increment: xpEarned },
+          balance:  { increment: data.amount },
+        },
+      });
+
+      if (newBadgeKeys.length > 0) {
+        await tx.userBadge.createMany({
+          data:           newBadgeKeys.map((badgeKey) => ({ userId: data.userId, badgeKey, imageUrl: null })),
+          skipDuplicates: true,
+        });
+      }
+
+      await tx.payment.update({
+        where: { id: paymentId },
+        data:  { status: "APPROVED", donationId: donation.id },
+      });
 
       return donation as DonationWithRelations;
     });
