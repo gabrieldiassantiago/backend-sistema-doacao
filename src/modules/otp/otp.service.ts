@@ -46,7 +46,12 @@ export class OtpService {
       data: { identifier, value: otp, expiresAt },
     });
 
-    await sendOTPEmail(email, otp, userName);
+    try {
+      await sendOTPEmail(email, otp, userName);
+    } catch (err) {
+      await this.prisma.verification.deleteMany({ where: { identifier } });
+      throw err;
+    }
   }
 
   async verifyOTP(

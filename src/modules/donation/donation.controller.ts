@@ -1,17 +1,9 @@
 import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
-import { DonationService } from "./donation.service";
-import { DonationRepository } from "./donation.repository";
-import { CauseRepository } from "../cause/cause.repository";
-import { UserRepository } from "../user/user.repository";
-import { prisma } from "../../lib/prisma";
+import { container } from "../../container";
 import { CreateDonationSchema, DonationParamsSchema } from "./donation.schema";
 
-const donationService = new DonationService(
-  new DonationRepository(prisma),
-  new CauseRepository(prisma),
-  new UserRepository(prisma),
-);
+const { donationService } = container;
 
 export const donationController = new Elysia({ prefix: "/donations" })
   .use(betterAuthMiddleware)
