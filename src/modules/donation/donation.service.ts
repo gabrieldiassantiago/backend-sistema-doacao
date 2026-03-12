@@ -1,36 +1,21 @@
-import { ICauseRepository } from "../cause/cause.repository";
-import { IUserRepository } from "../user/user.repository";
+import type { ICauseRepository } from "../cause/cause.types";
+import type { IUserRepository } from "../user/user.types";
+import { sendDonationConfirmationEmail } from "../../lib/mailer";
 import {
   BADGE_META,
-  BadgeMeta,
-  LevelInfo,
   computeLevel,
   computeNewBadges,
   computeXpForDonation,
 } from "./gamification.service";
-import {
+import type {
   CreateDonationData,
+  DonationResult,
   DonationWithRelations,
   IDonationRepository,
+  IDonationService,
   LeaderboardEntry,
-} from "./donation.repository";
-
-
-export type DonationResult = {
-  donation:   DonationWithRelations;
-  xpEarned:   number;
-  newBadges:  BadgeMeta[];
-  currentXp:  number;
-  level:      LevelInfo;
-};
-
-export interface IDonationService {
-  create(data: CreateDonationData): Promise<DonationResult>;
-  findById(id: string): Promise<DonationWithRelations | null>;
-  findByUser(userId: string, skip: number, take: number): Promise<DonationWithRelations[]>;
-  findByCause(causeId: string, skip: number, take: number): Promise<DonationWithRelations[]>;
-  getLeaderboard(take: number): Promise<LeaderboardEntry[]>;
-}
+  PaymentInput,
+} from "./donation.types";
 
 export class DonationService implements IDonationService {
   constructor(
@@ -67,13 +52,74 @@ export class DonationService implements IDonationService {
     const updatedUser = await this.userRepository.findById(data.userId);
     const currentXp   = updatedUser?.xpPoints ?? 0;
 
-    return {
+    const result: DonationResult = {
       donation,
       xpEarned,
       newBadges: newBadgeKeys.map((k) => BADGE_META[k]),
       currentXp,
       level: computeLevel(currentXp),
     };
+
+    if (updatedUser?.email) {
+      sendDonationConfirmationEmail(updatedUser.email, {
+        userName:   updatedUser.name,
+        causeTitle: cause.title,
+        amount:     data.amount,
+        xpEarned,
+        newBadges:  result.newBadges,
+        levelName:  result.level.name,
+      }).catch((err) => console.error("[email] Erro ao enviar confirmação:", err));
+    }
+
+    return result;
+  }
+
+  // Chamado pelo PaymentService após webhook do MP confirmar pagamento aprovado
+  async createFromPayment(payment: PaymentInput): Promise<DonationResult> {
+    const stats = await this.donationRepository.getUserStats(payment.userId);
+
+    const donationCountAfter = stats.donationCount + 1;
+    const totalDonatedAfter  = stats.totalDonated + payment.amount;
+
+    const xpEarned     = computeXpForDonation(payment.amount, donationCountAfter);
+    const newBadgeKeys = computeNewBadges(donationCountAfter, totalDonatedAfter, stats.earnedBadgeKeys);
+
+    const donation = await this.donationRepository.createWithGamificationAndPayment(
+      {
+        amount:  payment.amount,
+        message: payment.message ?? undefined,
+        userId:  payment.userId,
+        causeId: payment.causeId,
+      },
+      xpEarned,
+      newBadgeKeys,
+      payment.id,
+    );
+
+    const updatedUser = await this.userRepository.findById(payment.userId);
+    const cause       = await this.causeRepository.findById(payment.causeId);
+    const currentXp   = updatedUser?.xpPoints ?? 0;
+
+    const result: DonationResult = {
+      donation,
+      xpEarned,
+      newBadges: newBadgeKeys.map((k) => BADGE_META[k]),
+      currentXp,
+      level: computeLevel(currentXp),
+    };
+
+    if (updatedUser?.email && cause) {
+      sendDonationConfirmationEmail(updatedUser.email, {
+        userName:   updatedUser.name,
+        causeTitle: cause.title,
+        amount:     payment.amount,
+        xpEarned,
+        newBadges:  result.newBadges,
+        levelName:  result.level.name,
+      }).catch((err) => console.error("[email] Erro ao enviar confirmação:", err));
+    }
+
+    return result;
   }
 
   async findById(id: string): Promise<DonationWithRelations | null> {
