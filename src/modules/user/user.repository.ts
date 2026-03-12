@@ -1,50 +1,5 @@
-import { BadgeKey, Prisma, PrismaClient, User } from "../../../generated/prisma/client";
-
-export type UserProfile = {
-  id: string;
-  name: string;
-  email: string;
-  image: string | null;
-  xpPoints: number;
-  createdAt: Date;
-  badges: {
-    id: string;
-    badgeKey: BadgeKey;
-    earnedAt: Date;
-  }[];
-  donations: {
-    id: string;
-    amount: number;
-    message: string | null;
-    createdAt: Date;
-    cause: {
-      id: string;
-      title: string;
-      imageUrl: string | null;
-    };
-  }[];
-  createdCauses: {
-    id: string;
-    title: string;
-    imageUrl: string | null;
-    goalAmount: number;
-    raised: number;
-    status: string;
-    createdAt: Date;
-  }[];
-  _count: {
-    donations: number;
-    createdCauses: number;
-  };
-};
-
-export interface IUserRepository {
-   findById(id: string): Promise<User | null>;
-   findByEmail(email: string): Promise<User | null>;
-   findByName(name: string): Promise<User | null>;
-   update(id: string, data: Prisma.UserUpdateInput): Promise<User>;
-   profile(id: string): Promise<UserProfile | null>;
-}
+import { Prisma, PrismaClient, User } from "../../../generated/prisma/client";
+import type { IUserRepository, UserProfile } from "./user.types";
 
 export class UserRepository implements IUserRepository {
     constructor(private readonly prisma: PrismaClient) {}

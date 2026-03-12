@@ -1,11 +1,9 @@
 import Elysia from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
-import { UserService } from "./user.service";
-import { UserRepository } from "./user.repository";
-import { prisma } from "../../lib/prisma";
+import { container } from "../../container";
 import { UpdateUserSchema, UserParamsSchema } from "./user.schema";
 
-const userService = new UserService(new UserRepository(prisma));
+const { userService } = container;
 
 export const userController = new Elysia({ prefix: "/users" })
   .use(betterAuthMiddleware)
