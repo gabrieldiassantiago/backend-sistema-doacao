@@ -2,6 +2,7 @@ import type { ICauseRepository } from "../cause/cause.types";
 import type { IDonationService } from "../donation/donation.types";
 import type { IUserRepository } from "../user/user.types";
 import { mpPaymentClient } from "../../lib/mercadopago";
+import { sendDonationConfirmationEmail, sendPaymentFailedEmail } from "../../lib/mailer";
 import type {
   InitiatePaymentResult,
   IPaymentRepository,
@@ -103,7 +104,24 @@ export class PaymentService implements IPaymentService {
           cancelled: "CANCELLED",
         };
         const mapped = statusMap[mpStatus];
-        if (mapped) await this.paymentRepository.updateStatus(payment.id, mapped);
+        if (mapped) {
+          await this.paymentRepository.updateStatus(payment.id, mapped);
+          
+          try {
+            const user = await this.userRepository.findById(payment.userId);
+            const cause = await this.causeRepository.findById(payment.causeId);
+            
+            if (user && cause && payment.payerEmail) {
+              await sendPaymentFailedEmail(payment.payerEmail, {
+                userName: user.name,
+                causeTitle: cause.title,
+                amount: payment.amount,
+              });
+            }
+          } catch (emailErr) {
+            console.error(`[webhook] Erro ao enviar email de falha para o pagamento ${mpPaymentId}:`, emailErr);
+          }
+        }
       }
       return { processed: false, reason: `status_is_${mpStatus}` };
     }
@@ -119,6 +137,24 @@ export class PaymentService implements IPaymentService {
       userId:  payment.userId,
       causeId: payment.causeId,
     });
+
+    try {
+      const user = await this.userRepository.findById(payment.userId);
+      const cause = await this.causeRepository.findById(payment.causeId);
+      
+      if (user && cause && payment.payerEmail) {
+        await sendDonationConfirmationEmail(payment.payerEmail, {
+          userName: user.name,
+          causeTitle: cause.title,
+          amount: payment.amount,
+          xpEarned: result.xpEarned ?? 0,
+          newBadges: (result.newBadges ?? []).map((b: any) => ({ name: b.name, icon: b.icon })),
+          levelName: result.level?.name ?? "Nível 1",
+        });
+      }
+    } catch (emailErr) {
+      console.error(`[webhook] Erro ao enviar email de sucesso para o pagamento ${mpPaymentId}:`, emailErr);
+    }
 
     return {
       processed: true,

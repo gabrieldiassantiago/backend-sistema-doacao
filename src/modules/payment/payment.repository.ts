@@ -17,7 +17,7 @@ export class PaymentRepository implements IPaymentRepository {
     return this.prisma.payment.findUnique({
       where: { id },
       include: {
-        cause: { select: { id: true, title: true, imageUrl: true } },
+        cause: { select: { id: true, title: true, imageUrls: true } },
         user:  { select: { id: true, name: true, image: true } },
       },
     });
@@ -41,7 +41,7 @@ export class PaymentRepository implements IPaymentRepository {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        cause: { select: { id: true, title: true, imageUrl: true } },
+        cause: { select: { id: true, title: true, imageUrls: true } },
       },
     });
   }

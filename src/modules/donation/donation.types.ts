@@ -9,7 +9,7 @@ export type DonationWithRelations = {
   userId:    string;
   causeId:   string;
   createdAt: Date;
-  cause:     { id: string; title: string; imageUrl: string | null };
+  cause:     { id: string; title: string; imageUrls: string[] };
   user:      { id: string; name: string; image: string | null };
 };
 
