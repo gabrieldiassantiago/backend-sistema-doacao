@@ -1,11 +1,12 @@
 import { Cause } from "../../../generated/prisma/client";
 import type { ICauseRepository, ICauseService } from "./cause.types";
-import type { CreateCauseSchema, UpdateCauseDTO } from "./cause.schema";
+import { NotFoundError, ForbiddenError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 
 export class CauseService implements ICauseService {
     constructor(private readonly causeRepository: ICauseRepository) {}
 
-    async create(data: CreateCauseSchema, authorId: string): Promise<Cause> {
+    async create(data: { title: string; description: string; goalAmount: number; imageUrls: string[]; isFeatured?: boolean }, authorId: string): Promise<Cause> {
         return this.causeRepository.create({ ...data, authorId });
     }
 
@@ -17,17 +18,17 @@ export class CauseService implements ICauseService {
         return this.causeRepository.findActiveCauses(skip, take);
     }
 
-    async updateCause(id: string, data: UpdateCauseDTO, userId: string): Promise<Cause> {
+    async updateCause(id: string, data: { title?: string; description?: string; goalAmount?: number; imageUrls?: string[]; isFeatured?: boolean }, userId: string): Promise<Cause> {
         const cause = await this.causeRepository.findById(id);
-        if (!cause) throw new Error("Cause not found");
-        if (cause.authorId !== userId) throw new Error("Unauthorized");
+        if (!cause) throw new NotFoundError("Causa não encontrada", ErrorCodes.CAUSE_NOT_FOUND);
+        if (cause.authorId !== userId) throw new ForbiddenError("Você não tem permissão para atualizar esta causa", ErrorCodes.FORBIDDEN);
         return this.causeRepository.update(id, data);
     }
 
     async deleteCause(id: string, userId: string): Promise<Cause> {
         const cause = await this.causeRepository.findById(id);
-        if (!cause) throw new Error("Cause not found");
-        if (cause.authorId !== userId) throw new Error("Unauthorized");
+        if (!cause) throw new NotFoundError("Causa não encontrada", ErrorCodes.CAUSE_NOT_FOUND);
+        if (cause.authorId !== userId) throw new ForbiddenError("Você não tem permissão para deletar esta causa", ErrorCodes.FORBIDDEN);
         return this.causeRepository.delete(id);
     }
 
