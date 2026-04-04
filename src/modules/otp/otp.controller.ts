@@ -1,68 +1,54 @@
 import Elysia, { t } from "elysia";
-import { betterAuthMiddleware } from "../../middleware/auth";
 import { OtpService } from "./otp.service";
 import { prisma } from "../../lib/prisma";
+import { BadRequestError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 
 const otpService = new OtpService(prisma);
 
 export const otpController = new Elysia({ prefix: "/otp" })
-  .use(betterAuthMiddleware)
-
   .post(
     "/send",
-    async ({ user, set }) => {
-      if (user.emailVerified) {
-        set.status = 400;
-        return { message: "Seu email já foi verificado." };
-      }
+    async ({ body }) => {
 
-      try {
-        await otpService.sendOTP(user.email, user.name);
-        return { message: "Código enviado para seu email." };
-      } catch (err: any) {
-        set.status = 429;
-        return { message: err.message ?? "Erro ao enviar código." };
-      }
+      await otpService.sendOTP(body.email, body.email.split('@')[0]);
+      return { message: "Código enviado para seu email." };
     },
     {
-      auth: true,
+      body: t.Object({
+        email: t.String({ format: "email" })
+      }),
       detail: {
         tags: ["OTP"],
-        summary: "Enviar código de verificação por email",
-        description:
-          "Gera um código OTP de 6 dígitos, válido por 10 minutos, e envia ao email do usuário autenticado. Possui cooldown de 60 segundos entre reenvios.",
+        summary: "Reenviar código de verificação",
       },
     },
   )
 
   .post(
     "/verify",
-    async ({ body, user, set }) => {
-      const result = await otpService.verifyOTP(user.email, body.otp, user.id);
+    async ({ body }) => {
 
-      if (!result.success) {
-        set.status = 400;
-        return { message: result.reason ?? "Código inválido ou expirado." };
-      }
+      const user = await prisma.user.findUnique({
+        where: { email: body.email }
+      });
+      if (!user) throw new BadRequestError("Usuário não encontrado.", ErrorCodes.BAD_REQUEST);
 
+      await otpService.verifyOTP(body.email, body.otp, user.id);
       return { message: "Email verificado com sucesso!" };
     },
     {
-      auth: true,
       body: t.Object({
+        email: t.String({ format: "email" }),
         otp: t.String({
           minLength: 6,
           maxLength: 6,
           pattern: "^[0-9]{6}$",
-          description: "Código OTP de 6 dígitos recebido por email",
-          examples: ["847392"],
         }),
       }),
       detail: {
         tags: ["OTP"],
-        summary: "Verificar código OTP",
-        description:
-          "Valida o código de 6 dígitos informado e, se correto, marca o email do usuário como verificado.",
+        summary: "Verificar código OTP (Deslogado)",
       },
     },
   );
