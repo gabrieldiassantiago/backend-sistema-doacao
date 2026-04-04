@@ -1,5 +1,7 @@
 import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
+import { NotFoundError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 import { container } from "../../container";
 import { InitiatePaymentSchema, WebhookSchema } from "./payment.schema";
 
@@ -12,13 +14,7 @@ export const paymentController = new Elysia({ prefix: "/payments" })
   .post(
     "/initiate",
     async ({ body, user, set }) => {
-      try {
-        return await paymentService.initiatePayment(body, user.id, user.email);
-      } catch (e: any) {
-        if (e.message === "Cause not found")               { set.status = 404; return { message: e.message }; }
-        if (e.message === "Cause is not accepting donations") { set.status = 400; return { message: e.message }; }
-        throw e;
-      }
+      return await paymentService.initiatePayment(body, user.id, user.email);
     },
     {
       auth: true,
@@ -64,7 +60,9 @@ export const paymentController = new Elysia({ prefix: "/payments" })
     "/:id",
     async ({ params, set }) => {
       const payment = await paymentService.findById(params.id);
-      if (!payment) { set.status = 404; return { message: "Payment not found" }; }
+      if (!payment) {
+        throw new NotFoundError("Pagamento não encontrado", ErrorCodes.PAYMENT_NOT_FOUND);
+      }
       return payment;
     },
     {
