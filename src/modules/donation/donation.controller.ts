@@ -2,6 +2,8 @@ import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
 import { container } from "../../container";
 import { CreateDonationSchema, DonationParamsSchema } from "./donation.schema";
+import { NotFoundError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 
 const { donationService } = container;
 
@@ -41,11 +43,10 @@ export const donationController = new Elysia({ prefix: "/donations" })
   // Donation por ID
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params }) => {
       const donation = await donationService.findById(params.id);
       if (!donation) {
-        set.status = 404;
-        return { message: "Donation not found" };
+        throw new NotFoundError("Doação não encontrada", ErrorCodes.DONATION_NOT_FOUND);
       }
       return donation;
     },
@@ -78,21 +79,8 @@ export const donationController = new Elysia({ prefix: "/donations" })
 
   .post(
     "/",
-    async ({ body, user, set }) => {
-      try {
-        return await donationService.create({ ...body, userId: user.id });
-      } catch (e: any) {
-        if (e.message === "Cause not found") {
-          set.status = 404;
-          return { message: e.message };
-        }
-        if (e.message === "Cause is not accepting donations") {
-          set.status = 400;
-          return { message: e.message };
-        }
-        throw e;
-      }
-    },
+    async ({ body, user }) =>
+      donationService.create({ ...body, userId: user.id }),
     {
       auth: true,
       body: CreateDonationSchema,
