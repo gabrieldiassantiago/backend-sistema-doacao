@@ -2,7 +2,9 @@ import type { ICauseRepository } from "../cause/cause.types";
 import type { IDonationService } from "../donation/donation.types";
 import type { IUserRepository } from "../user/user.types";
 import { mpPaymentClient } from "../../lib/mercadopago";
-import { sendDonationConfirmationEmail, sendPaymentFailedEmail } from "../../lib/mailer";
+import { NotFoundError, BadRequestError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
+import { container } from "../../container";
 import type {
   InitiatePaymentResult,
   IPaymentRepository,
@@ -28,9 +30,13 @@ export class PaymentService implements IPaymentService {
 
     const cause = await this.causeRepository.findById(data.causeId);
     
-    if (!cause)                   throw new Error("Causa não encontrada");
+    if (!cause) {
+      throw new NotFoundError("Causa não encontrada", ErrorCodes.CAUSE_NOT_FOUND);
+    }
 
-    if (cause.status !== "ACTIVE") throw new Error("Causa não está aceitando doações");
+    if (cause.status !== "ACTIVE") {
+      throw new BadRequestError("Causa não está aceitando doações", ErrorCodes.CAUSE_NOT_ACTIVE);
+    }
 
     // Cria o Payment no banco com status PENDING antes de chamar o MP
     const payment = await this.paymentRepository.create({
@@ -49,7 +55,7 @@ export class PaymentService implements IPaymentService {
         payer:              { email: payerEmail },
         description:        `Doação para: ${cause.title}`,
         external_reference: payment.id,
-        notification_url:   'https://e114-2804-14c-418f-81fc-6e8a-b3ca-3bd4-d6b4.ngrok-free.app/payments/webhook', // URL do webhook para receber notificações do MP
+        notification_url: 'https://projeto-doacao-production.up.railway.app/payments/webhook'
       },
       requestOptions: { idempotencyKey: payment.id },
     });
@@ -112,7 +118,7 @@ export class PaymentService implements IPaymentService {
             const cause = await this.causeRepository.findById(payment.causeId);
             
             if (user && cause && payment.payerEmail) {
-              await sendPaymentFailedEmail(payment.payerEmail, {
+              await container.emailQueueService.enqueuePaymentFailed(payment.payerEmail, {
                 userName: user.name,
                 causeTitle: cause.title,
                 amount: payment.amount,
@@ -143,7 +149,7 @@ export class PaymentService implements IPaymentService {
       const cause = await this.causeRepository.findById(payment.causeId);
       
       if (user && cause && payment.payerEmail) {
-        await sendDonationConfirmationEmail(payment.payerEmail, {
+        await container.emailQueueService.enqueueDonationConfirmation(payment.payerEmail, {
           userName: user.name,
           causeTitle: cause.title,
           amount: payment.amount,
