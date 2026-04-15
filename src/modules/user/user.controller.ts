@@ -2,6 +2,8 @@ import Elysia from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
 import { container } from "../../container";
 import { UpdateUserSchema, UserParamsSchema } from "./user.schema";
+import { NotFoundError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 
 const { userService } = container;
 
@@ -10,11 +12,10 @@ export const userController = new Elysia({ prefix: "/users" })
 
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params }) => {
       const user = await userService.findById(params.id);
       if (!user) {
-        set.status = 404;
-        return { message: "User not found" };
+        throw new NotFoundError("Usuário não encontrado", ErrorCodes.USER_NOT_FOUND);
       }
       return user;
     },
@@ -26,11 +27,10 @@ export const userController = new Elysia({ prefix: "/users" })
 
   .get(
     "/me/profile",
-    async ({ user, set }) => {
+    async ({ user }) => {
       const profile = await userService.getProfile(user.id);
       if (!profile) {
-        set.status = 404;
-        return { message: "User not found" };
+        throw new NotFoundError("Usuário não encontrado", ErrorCodes.USER_NOT_FOUND);
       }
       return profile;
     },
@@ -51,14 +51,7 @@ export const userController = new Elysia({ prefix: "/users" })
 
   .patch(
     "/me",
-    async ({ body, user, set }) => {
-      try {
-        return await userService.update(user.id, body);
-      } catch (e: any) {
-        set.status = 400;
-        return { message: e.message };
-      }
-    },
+    async ({ body, user }) => userService.update(user.id, body),
     {
       auth: true,
       body: UpdateUserSchema,
