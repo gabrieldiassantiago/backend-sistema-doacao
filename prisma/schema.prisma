@@ -25,6 +25,7 @@ model User {
   payments      Payment[]
   withdrawals   Withdrawal[]
   passwordHash  String?
+  isAdmin       Boolean
   accounts      Account[]
 
   @@map("user")
@@ -84,12 +85,24 @@ model Cause {
   donations     Donation[]
   payments      Payment[]
   withdrawals   Withdrawal[]
-  imageUrls     String[]
+  images        CauseImage[]
   balance       Float        @default(0)
   createdAt     DateTime     @default(now())
-  //flag pra controlar se bateu a meta
   isGoalReached Boolean      @default(false)
   updatedAt     DateTime     @updatedAt
+}
+
+model CauseImage {
+  id        String   @id @default(uuid())
+  causeId   String
+  cause     Cause    @relation(fields: [causeId], references: [id], onDelete: Cascade)
+  key       String
+  position  Int
+  createdAt DateTime @default(now())
+
+  @@index([causeId])
+  @@unique([causeId, position])
+  @@map("cause_image")
 }
 
 enum PaymentStatus {
@@ -201,4 +214,37 @@ model Account {
 
   @@index([userId])
   @@map("account")
+}
+
+model CollectionPoint {
+  id           String         @id @default(uuid())
+  name         String
+  // Endereço
+  street       String
+  number       String
+  complement   String?
+  neighborhood String?
+  city         String
+  state        String
+  zipCode      String?
+  country      String         @default("Brasil")
+  // Geolocalização
+  latitude     Float
+  longitude    Float
+  // Metadados
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  acceptedItems AcceptedItem[]
+
+  @@map("collection_point")
+}
+
+model AcceptedItem {
+  id                String          @id @default(uuid())
+  name              String
+  collectionPointId String
+  collectionPoint   CollectionPoint @relation(fields: [collectionPointId], references: [id], onDelete: Cascade)
+
+  @@map("accepted_item")
 }
