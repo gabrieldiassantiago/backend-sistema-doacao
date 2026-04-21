@@ -22,7 +22,7 @@ export class DonationRepository implements IDonationRepository {
       const donation = await tx.donation.create({
         data: { ...data, xpEarned },
         include: {
-          cause: { select: { id: true, title: true, imageUrls: true } },
+          cause: { select: { id: true, title: true, images: true } },
           user: { select: { id: true, name: true, image: true } },
         }
       });
@@ -50,7 +50,7 @@ export class DonationRepository implements IDonationRepository {
         });
       }
 
-      return donation as DonationWithRelations;
+      return donation;
     });
   }
 
@@ -64,7 +64,7 @@ export class DonationRepository implements IDonationRepository {
       const donation = await tx.donation.create({
         data: { ...data, xpEarned },
         include: {
-          cause: { select: { id: true, title: true, imageUrls: true } },
+          cause: { select: { id: true, title: true, images: true } },
           user: { select: { id: true, name: true, image: true } },
         }
       });
@@ -97,7 +97,7 @@ export class DonationRepository implements IDonationRepository {
         data: { status: "APPROVED", donationId: donation.id },
       });
 
-      return donation as DonationWithRelations;
+      return donation;
     });
   }
 
@@ -105,10 +105,10 @@ export class DonationRepository implements IDonationRepository {
     return this.prisma.donation.findUnique({
       where: { id },
       include: {
-        cause: { select: { id: true, title: true, imageUrls: true } },
+        cause: { select: { id: true, title: true, images: true } },
         user: { select: { id: true, name: true, image: true } },
       }
-    }) as Promise<DonationWithRelations | null>;
+    });
   }
 
   async findByUser(userId: string, skip = 0, take = 20): Promise<DonationWithRelations[]> {
@@ -118,10 +118,10 @@ export class DonationRepository implements IDonationRepository {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        cause: { select: { id: true, title: true, imageUrls: true } },
+        cause: { select: { id: true, title: true, images: true } },
         user: { select: { id: true, name: true, image: true } },
       }
-    }) as Promise<DonationWithRelations[]>;
+    });
   }
 
   async findByCause(causeId: string, skip = 0, take = 20): Promise<DonationWithRelations[]> {
@@ -131,10 +131,10 @@ export class DonationRepository implements IDonationRepository {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        cause: { select: { id: true, title: true, imageUrls: true } },
+        cause: { select: { id: true, title: true, images: true } },
         user: { select: { id: true, name: true, image: true } },
       }
-    }) as Promise<DonationWithRelations[]>;
+    });
   }
 
   async getUserStats(userId: string): Promise<UserDonationStats> {
