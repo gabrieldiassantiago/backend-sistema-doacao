@@ -2,6 +2,8 @@ import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
 import { container } from "../../container";
 import { CreateWithdrawalSchema, WithdrawalParamsSchema } from "./withdrawal.schema";
+import { NotFoundError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 
 const { withdrawalService } = container;
 
@@ -11,17 +13,7 @@ export const withdrawalController = new Elysia({ prefix: "/withdrawals" })
   // Solicita um saque via PIX para o dono da causa
   .post(
     "/",
-    async ({ body, user, set }) => {
-      try {
-        return await withdrawalService.create(body, user.id);
-      } catch (e: any) {
-        if (e.message === "Cause not found")     { set.status = 404; return { message: e.message }; }
-        if (e.message === "Unauthorized")        { set.status = 403; return { message: "Você não é o dono desta causa" }; }
-        if (e.message === "Insufficient balance") { set.status = 400; return { message: "Saldo insuficiente na causa" }; }
-        if (e.message?.startsWith("Transferência falhou")) { set.status = 502; return { message: e.message }; }
-        throw e;
-      }
-    },
+    async ({ body, user }) => withdrawalService.create(body, user.id),
     {
       auth: true,
       body: CreateWithdrawalSchema,
@@ -53,20 +45,13 @@ export const withdrawalController = new Elysia({ prefix: "/withdrawals" })
   // Histórico de saques de uma causa (somente o dono acessa)
   .get(
     "/cause/:causeId",
-    async ({ params, user, query, set }) => {
-      try {
-        return await withdrawalService.findByCause(
-          params.causeId,
-          user.id,
-          Number(query.skip) || 0,
-          Number(query.take) || 20,
-        );
-      } catch (e: any) {
-        if (e.message === "Cause not found") { set.status = 404; return { message: e.message }; }
-        if (e.message === "Unauthorized")    { set.status = 403; return { message: "Acesso negado" }; }
-        throw e;
-      }
-    },
+    ({ params, user, query }) =>
+      withdrawalService.findByCause(
+        params.causeId,
+        user.id,
+        Number(query.skip) || 0,
+        Number(query.take) || 20,
+      ),
     {
       auth: true,
       params: t.Object({ causeId: t.String() }),
@@ -81,9 +66,11 @@ export const withdrawalController = new Elysia({ prefix: "/withdrawals" })
   // Busca um saque por ID
   .get(
     "/:id",
-    async ({ params, set }) => {
+    async ({ params }) => {
       const w = await withdrawalService.findById(params.id);
-      if (!w) { set.status = 404; return { message: "Withdrawal not found" }; }
+      if (!w) {
+        throw new NotFoundError("Saque não encontrado", ErrorCodes.WITHDRAWAL_NOT_FOUND);
+      }
       return w;
     },
     {
