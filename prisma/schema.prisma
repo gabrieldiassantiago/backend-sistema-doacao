@@ -172,6 +172,7 @@ model UserBadge {
 
 enum WithdrawalStatus {
   PENDING
+  APPROVED
   PROCESSING
   COMPLETED
   FAILED
