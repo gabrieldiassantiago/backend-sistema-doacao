@@ -1,12 +1,13 @@
 import type { ICauseRepository } from "../cause/cause.types";
 import type { IUserRepository } from "../user/user.types";
-import { sendDonationConfirmationEmail } from "../../lib/mailer";
 import {
   BADGE_META,
   computeLevel,
   computeNewBadges,
   computeXpForDonation,
 } from "./gamification.service";
+import { BadRequestError, NotFoundError } from "../../errors/error-classes";
+import { ErrorCodes } from "../../errors/error-codes";
 import type {
   CreateDonationData,
   DonationResult,
@@ -16,20 +17,27 @@ import type {
   LeaderboardEntry,
   PaymentInput,
 } from "./donation.types";
+import type { EmailQueueService } from "../../jobs/email-queue";
 
 export class DonationService implements IDonationService {
   constructor(
     private readonly donationRepository: IDonationRepository,
     private readonly causeRepository:    ICauseRepository,
     private readonly userRepository:     IUserRepository,
+    private readonly emailQueueService:  EmailQueueService,
   ) {}
 
   async create(data: CreateDonationData): Promise<DonationResult> {
     // valida a causa e o usuário
     const cause = await this.causeRepository.findById(data.causeId);
 
-    if (!cause) throw new Error("Cause not found");
-    if (cause.status !== "ACTIVE") throw new Error("Cause is not accepting donations");
+    if (!cause) {
+      throw new NotFoundError("Causa não encontrada", ErrorCodes.CAUSE_NOT_FOUND);
+    }
+
+    if (cause.status !== "ACTIVE") {
+      throw new BadRequestError("Causa não está aceitando doações", ErrorCodes.CAUSE_NOT_ACTIVE);
+    }
 
     // busca stats atuais do usuário para calcular XP e badges
     const stats = await this.donationRepository.getUserStats(data.userId);
@@ -61,14 +69,14 @@ export class DonationService implements IDonationService {
     };
 
     if (updatedUser?.email) {
-      sendDonationConfirmationEmail(updatedUser.email, {
+      this.emailQueueService.enqueueDonationConfirmation(updatedUser.email, {
         userName:   updatedUser.name,
         causeTitle: cause.title,
         amount:     data.amount,
         xpEarned,
         newBadges:  result.newBadges,
         levelName:  result.level.name,
-      }).catch((err) => console.error("[email] Erro ao enviar confirmação:", err));
+      }).catch((err: any) => console.error("[email] Erro ao enviar confirmação:", err));
     }
 
     return result;
@@ -109,14 +117,14 @@ export class DonationService implements IDonationService {
     };
 
     if (updatedUser?.email && cause) {
-      sendDonationConfirmationEmail(updatedUser.email, {
+      this.emailQueueService.enqueueDonationConfirmation(updatedUser.email, {
         userName:   updatedUser.name,
         causeTitle: cause.title,
         amount:     payment.amount,
         xpEarned,
         newBadges:  result.newBadges,
         levelName:  result.level.name,
-      }).catch((err) => console.error("[email] Erro ao enviar confirmação:", err));
+      }).catch((err: any) => console.error("[email] Erro ao enviar confirmação:", err));
     }
 
     return result;
