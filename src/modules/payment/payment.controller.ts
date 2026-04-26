@@ -99,4 +99,5 @@ export const paymentController = new Elysia({ prefix: "/payments" })
       }),
       detail: { tags: ["Payments"], summary: "Pagamentos recebidos por uma causa" },
     },
-  );
+  )
+  

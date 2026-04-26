@@ -7,7 +7,7 @@ import type {
 } from "./payment.types";
 
 export class PaymentRepository implements IPaymentRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) { }
 
   async create(data: CreatePaymentData) {
     return this.prisma.payment.create({ data });
@@ -17,8 +17,8 @@ export class PaymentRepository implements IPaymentRepository {
     return this.prisma.payment.findUnique({
       where: { id },
       include: {
-        cause: { select: { id: true, title: true, imageUrls: true } },
-        user:  { select: { id: true, name: true, image: true } },
+        cause: { select: { id: true, title: true, images: true } },
+        user: { select: { id: true, name: true, image: true } },
       },
     });
   }
@@ -30,25 +30,25 @@ export class PaymentRepository implements IPaymentRepository {
   async updateStatus(id: string, status: PaymentStatusValue, extra?: PaymentUpdate) {
     return this.prisma.payment.update({
       where: { id },
-      data:  { status, ...extra },
+      data: { status, ...extra },
     });
   }
 
   async findByUser(userId: string, skip = 0, take = 20) {
     return this.prisma.payment.findMany({
-      where:   { userId },
+      where: { userId },
       skip,
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        cause: { select: { id: true, title: true, imageUrls: true } },
+        cause: { select: { id: true, title: true, images: true } },
       },
     });
   }
 
   async findByCause(causeId: string, skip = 0, take = 20) {
     return this.prisma.payment.findMany({
-      where:   { causeId },
+      where: { causeId },
       skip,
       take,
       orderBy: { createdAt: "desc" },
