@@ -45,7 +45,7 @@ export const categoryController = new Elysia({ prefix: "/categories" })
     "/",
     async ({ body }) => categoryService.create(body),
     {
-      auth: true,
+      isAdmin: true,
       body: CreateCategorySchema,
       detail: { tags: ["Categories"], summary: "Criar categoria" },
     }
