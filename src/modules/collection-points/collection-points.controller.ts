@@ -7,6 +7,7 @@ import {
   CreateCollectionPointSchema,
   UpdateCollectionPointSchema,
   CollectionPointParamsSchema,
+  GetCollectionPointsQuerySchema,
 } from './collection-points.schema';
 
 const { collectionPointService } = container;
@@ -18,17 +19,43 @@ export const collectionPointController = new Elysia({ prefix: '/collection-point
   .get(
     '/',
     async ({ query }) => {
-      return collectionPointService.getActive(
-        Number(query.skip) || 0,
-        Number(query.take) || 20,
-      );
+      return collectionPointService.getActive({
+        skip: query.skip ? Number(query.skip) : undefined,
+        take: query.take ? Number(query.take) : undefined,
+        sort: query.sort,
+        city: query.city,
+        state: query.state,
+        lat: query.lat !== undefined ? Number(query.lat) : undefined,
+        lng: query.lng !== undefined ? Number(query.lng) : undefined,
+        radius: query.radius !== undefined ? Number(query.radius) : undefined,
+        search: query.search,
+      });
     },
     {
-      query: t.Object({
-        skip: t.Optional(t.Numeric()),
-        take: t.Optional(t.Numeric()),
-      }),
-      detail: { tags: ['Collection Points'], summary: 'Listar pontos de coleta ativos (público)' },
+      query: GetCollectionPointsQuerySchema,
+      detail: {
+        tags: ['Collection Points'],
+        summary: 'Listar pontos de coleta ativos com filtros',
+        description: [
+          'Retorna pontos de coleta ativos com suporte a filtros e proximidade.',
+          '',
+          '**Ordenação (`sort`)**:',
+          '- `recent` — mais recentes primeiro (padrão)',
+          '- `nearest` — mais próximos do usuário (requer `lat` e `lng`)',
+          '',
+          '**Filtro por localização**:',
+          '- `city` / `state` — texto parcial, case-insensitive',
+          '- `lat` + `lng` + `radius` — coordenadas em graus decimais e raio em km (padrão 50)',
+          '',
+          '**Busca**:',
+          '- `search` — busca por nome do ponto ou item aceito',
+          '',
+          '**Exemplo — pontos perto de Lorena num raio de 30 km**:',
+          '```',
+          'GET /collection-points?sort=nearest&lat=-22.7261&lng=-45.1227&radius=30',
+          '```',
+        ].join('\n'),
+      },
     },
   )
 
