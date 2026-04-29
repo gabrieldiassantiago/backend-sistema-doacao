@@ -73,6 +73,7 @@ export class UserRepository implements IUserRepository {
             raised: true,
             status: true,
             createdAt: true,
+            balance: true,
           },
         },
         _count: {
