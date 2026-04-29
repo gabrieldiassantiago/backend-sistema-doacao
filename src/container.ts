@@ -1,4 +1,3 @@
-
 import { prisma } from "./lib/prisma";
 
 import { CauseRepository } from "./modules/cause/cause.repository";
@@ -42,6 +41,7 @@ export type AppContainer = {
 export type ContainerOverrides = Partial<AppContainer>;
 
 export function createContainer(overrides: ContainerOverrides = {}): AppContainer {
+  // Repositories
   const causeRepository = overrides.causeRepository ?? new CauseRepository(prisma);
   const categoryRepository = overrides.categoryRepository ?? new CategoryRepository(prisma);
   const userRepository = overrides.userRepository ?? new UserRepository(prisma);
@@ -51,33 +51,32 @@ export function createContainer(overrides: ContainerOverrides = {}): AppContaine
   const collectionPointRepository =
     overrides.collectionPointRepository ?? new CollectionPointRepository(prisma);
 
-  const causeService = overrides.causeService ?? new CauseService(causeRepository, categoryRepository);
+  // Infra services (precisam vir antes dos services que dependem deles)
+  const storageService = overrides.storageService ?? new S3StorageService();
+  const emailQueueService = overrides.emailQueueService ?? new EmailQueueService(getMailer());
+
+  // Domain services
+  const causeService =
+    overrides.causeService ??
+    new CauseService(causeRepository, categoryRepository, userRepository, storageService, emailQueueService);
+
   const categoryService = overrides.categoryService ?? new CategoryService(categoryRepository);
   const userService = overrides.userService ?? new UserService(userRepository);
-  const donationService = overrides.donationService ?? new DonationService(
-    donationRepository,
-    causeRepository,
-    userRepository,
-  );
 
-  const paymentService = overrides.paymentService ?? new PaymentService(
-    paymentRepository,
-    causeRepository,
-    userRepository,
-    donationService,
-  );
+  const donationService =
+    overrides.donationService ??
+    new DonationService(donationRepository, causeRepository, userRepository, emailQueueService);
 
-  const withdrawalService = overrides.withdrawalService ?? new WithdrawalService(
-    withdrawalRepository,
-    causeRepository,
-    prisma,
-  );
+  const paymentService =
+    overrides.paymentService ??
+    new PaymentService(paymentRepository, causeRepository, userRepository, donationService);
+
+  const withdrawalService =
+    overrides.withdrawalService ??
+    new WithdrawalService(withdrawalRepository, causeRepository, prisma);
 
   const collectionPointService =
     overrides.collectionPointService ?? new CollectionPointService(collectionPointRepository);
-
-  const storageService = overrides.storageService ?? new S3StorageService();
-  const emailQueueService = overrides.emailQueueService ?? new EmailQueueService(getMailer());
 
   return {
     causeRepository,
