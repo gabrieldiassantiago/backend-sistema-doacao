@@ -10,7 +10,9 @@ if (!databaseUrl) {
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: { rejectUnauthorized: false },
+  ssl: process.env.NODE_ENV === "production" 
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
 const adapter = new PrismaPg(pool);

@@ -7,6 +7,7 @@ import DonationConfirmationEmail from "../emails/donation-confirmation";
 import PaymentFailedEmail from "../emails/payment-failed";
 import { ExternalServiceError, InternalError } from "../errors/error-classes";
 import { ErrorCodes } from "../errors/error-codes";
+import CauseApprovalEmail from "../emails/cause-approval";
 
 export type DonationConfirmationEmailParams = {
   userName: string;
@@ -27,6 +28,7 @@ export interface IMailer {
   sendOTPEmail(to: string, otp: string, userName: string): Promise<void>;
   sendDonationConfirmationEmail(to: string, params: DonationConfirmationEmailParams): Promise<void>;
   sendPaymentFailedEmail(to: string, params: PaymentFailedEmailParams): Promise<void>;
+  sendCauseApprovalEmail(to: string, causeTitle: string): Promise<void>;
 }
 
 export class ResendMailer implements IMailer {
@@ -99,6 +101,16 @@ export class ResendMailer implements IMailer {
 
     await this.send(to, "⚠️ Aviso: Problema com o seu pagamento", html);
   }
+
+  async sendCauseApprovalEmail(
+    to: string,
+    causeTitle: string,
+  ): Promise<void> {
+    const html = renderToStaticMarkup(
+      React.createElement(CauseApprovalEmail, { causeTitle }),
+    );
+    await this.send(to, "Olá! Sua causa foi aprovada!", html);
+  }
 }
 
 let mailer: IMailer | null = null;
@@ -132,4 +144,11 @@ export async function sendPaymentFailedEmail(
   params: PaymentFailedEmailParams,
 ): Promise<void> {
   return getMailer().sendPaymentFailedEmail(to, params);
+}
+
+export async function sendCauseApprovalEmail(
+  to: string,
+  causeTitle: string,
+): Promise<void> {
+  return getMailer().sendCauseApprovalEmail(to, causeTitle);
 }
