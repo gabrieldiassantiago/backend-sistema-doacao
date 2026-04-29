@@ -7,6 +7,7 @@ import type {
   CreateCollectionPointData,
   UpdateCollectionPointData,
   CollectionPointWithItems,
+  CollectionPointFilterParams,
 } from './colleciton-points.types';
 
 export class CollectionPointService implements ICollectionPointService {
@@ -26,8 +27,8 @@ export class CollectionPointService implements ICollectionPointService {
     return this.collectionPointRepository.findAll(skip, take);
   }
 
-  async getActive(skip = 0, take = 20): Promise<CollectionPointWithItems[]> {
-    return this.collectionPointRepository.findActive(skip, take);
+  async getActive(filters: CollectionPointFilterParams = {}): Promise<CollectionPointWithItems[]> {
+    return this.collectionPointRepository.findActive(filters);
   }
 
   async update(id: string, data: UpdateCollectionPointData): Promise<CollectionPointWithItems> {

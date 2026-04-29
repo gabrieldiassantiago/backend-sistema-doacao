@@ -137,6 +137,7 @@ export class DonationService implements IDonationService {
   async findByUser(userId: string, skip = 0, take = 20): Promise<DonationWithRelations[]> {
     return this.donationRepository.findByUser(userId, skip, take);
   }
+  
 
   async findByCause(causeId: string, skip = 0, take = 20): Promise<DonationWithRelations[]> {
     return this.donationRepository.findByCause(causeId, skip, take);
