@@ -1,17 +1,58 @@
 import { betterAuth } from "better-auth";
-import { openAPI } from "better-auth/plugins";
+import { openAPI, emailOTP } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./lib/prisma";
+import { container } from "./container";
+
 
 export const auth = betterAuth({
+
     database: prismaAdapter(prisma, {
         provider: "postgresql",
     }),
+
+    user: {
+        additionalFields: {
+            isAdmin: {
+                type: "boolean",
+                required: true,
+                defaultValue: false,
+            }
+        }
+    },
+
+
+    trustedOrigins: ["https://doacao-frontend-swart.vercel.app", "http://localhost:3001"],
     emailAndPassword: {
         enabled: true,
+        autoSignIn: false,
+        requireEmailVerification: true,
+        
+        sendResetPassword: async ({ user, url, token }, request) => {
+            await container.emailQueueService.enqueueResetPassword(user.email, token, user.name);
+        },
+
+    },
+    baseURL: process.env.BETTER_AUTH_BASE_URL,
+
+    advanced: {
+        defaultCookieAttributes: {
+            sameSite: "lax",
+            secure: true,
+            httpOnly: true,
+        },
     },
     plugins: [
-        openAPI()
+        openAPI(),
+        emailOTP({
+            sendVerificationOnSignUp: true,
+            expiresIn: 600,
+            overrideDefaultEmailVerification: true,
+            async sendVerificationOTP({ email, otp }) {
+                const userName = email.split('@')[0];
+                await container.emailQueueService.enqueueOtp(email, otp, userName);
+            },
+        })
     ],
     basePath: "/api"
 });
