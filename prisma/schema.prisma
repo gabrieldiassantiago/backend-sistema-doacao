@@ -86,10 +86,24 @@ model Cause {
   payments      Payment[]
   withdrawals   Withdrawal[]
   images        CauseImage[]
+  documents     CauseDocument[]
   balance       Float        @default(0)
   createdAt     DateTime     @default(now())
   isGoalReached Boolean      @default(false)
   updatedAt     DateTime     @updatedAt
+
+  // Localização
+  locationName  String?
+  address       String?
+  city          String?
+  state         String?
+  country       String?
+  latitude      Float?
+  longitude     Float?
+
+  @@index([city])
+  @@index([status])
+  @@index([status, city])
 }
 
 model CauseImage {
@@ -248,4 +262,36 @@ model AcceptedItem {
   collectionPoint   CollectionPoint @relation(fields: [collectionPointId], references: [id], onDelete: Cascade)
 
   @@map("accepted_item")
+}
+
+enum DocType {
+  CNPJ_OR_CPF
+  ADDRESS_PROOF
+  POLICE_REPORT
+  MEDICAL_REPORT
+  OTHER
+}
+
+enum DocStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CauseDocument {
+  id              String   @id @default(uuid())
+  causeId         String
+  cause           Cause    @relation(fields: [causeId], references: [id], onDelete: Cascade)
+  
+  fileKey         String
+  fileName        String
+  docType         DocType
+  
+  status          DocStatus @default(PENDING)
+  rejectionReason String?
+  
+  createdAt       DateTime @default(now())
+
+  @@index([causeId])
+  @@map("cause_document")
 }
