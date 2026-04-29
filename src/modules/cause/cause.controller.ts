@@ -7,7 +7,12 @@ import {
   CauseParamsSchema,
   CreateCauseSchema,
   UpdateCauseSchema,
+  GetCausesQuerySchema,
+  AddDocumentSchema,
+  ReviewDocumentSchema,
+  ModerateCauseSchema
 } from "./cause.schema";
+
 
 const { causeService, storageService } = container;
 
@@ -76,23 +81,53 @@ export const causeController = new Elysia({ prefix: "/causes" })
 
       const startTime = Date.now();
 
-      const causes = await causeService.getActiveCauses(
-        Number(query.skip) || 0,
-        Number(query.take) || 20
-      );
+      const causes = await causeService.getActiveCauses({
+        skip: query.skip ? Number(query.skip) : undefined,
+        take: query.take ? Number(query.take) : undefined,
+        sort: query.sort,
+        city: query.city,
+        state: query.state,
+        lat: query.lat !== undefined ? Number(query.lat) : undefined,
+        lng: query.lng !== undefined ? Number(query.lng) : undefined,
+        radius: query.radius !== undefined ? Number(query.radius) : undefined,
+        categoryId: query.categoryId,
+        search: query.search,
+      });
 
-      pino.info(`Causas ativas buscadas com sucesso. Tempo: ${Date.now() - startTime}ms. Total: ${causes.length} causas`);
+      pino.info(
+        `Causas buscadas com sucesso. Tempo: ${Date.now() - startTime
+        }ms. Total: ${causes.length} causas. sort=${query.sort ?? "recent"}`
+      );
 
       return Promise.all(causes.map((cause) => withSignedImages(cause)));
     },
     {
-      query: t.Object({
-        skip: t.Optional(t.Numeric()),
-        take: t.Optional(t.Numeric()),
-      }),
-      detail: { tags: ["Causes"], summary: "Listar causas ativas" },
+      query: GetCausesQuerySchema,
+      detail: {
+        tags: ["Causes"],
+        summary: "Listar causas ativas com filtros",
+        description: [
+          "Retorna causas ativas com suporte a filtros e ordenação.",
+          "",
+          "**Ordenação (`sort`)**:",
+          "- `recent` — mais recentes primeiro (padrão)",
+          "- `most_popular` — maior número de doações primeiro",
+          "- `most_urgent` — menor arrecadação primeiro (maior necessidade)",
+          "- `nearest` — mais próximas do usuário (requer `lat` e `lng`)",
+          "",
+          "**Filtro por localização**:",
+          "- `city` / `state` — texto parcial, case-insensitive",
+          "- `lat` + `lng` + `radius` — coordenadas do usuário em graus decimais e raio em km (padrão 50 km)",
+          "",
+          "**Exemplo — perto de Recife num raio de 30 km**:",
+          "```",
+          "GET /causes?sort=nearest&lat=-8.0476&lng=-34.8770&radius=30",
+          "```",
+        ].join("\n"),
+      },
     }
   )
+
 
   .get(
     "/:id",
@@ -135,6 +170,13 @@ export const causeController = new Elysia({ prefix: "/causes" })
           categoryId: body.categoryId,
           imageKeys: uploadedImageKeys,
           isFeatured: body.isFeatured,
+          locationName: body.locationName,
+          address: body.address,
+          city: body.city,
+          state: body.state,
+          country: body.country,
+          latitude: body.latitude,
+          longitude: body.longitude,
         },
         user.id
       );
@@ -148,7 +190,7 @@ export const causeController = new Elysia({ prefix: "/causes" })
       body: CreateCauseSchema,
       detail: { tags: ["Causes"], summary: "Criar nova causa" },
     }
-  ) 
+  )
   .patch(
     "/:id",
     async ({ params, body, user }) => {
@@ -202,6 +244,13 @@ export const causeController = new Elysia({ prefix: "/causes" })
           categoryId: body.categoryId,
           isFeatured: body.isFeatured,
           imageKeys: finalImageKeys,
+          locationName: body.locationName,
+          address: body.address,
+          city: body.city,
+          state: body.state,
+          country: body.country,
+          latitude: body.latitude,
+          longitude: body.longitude,
         },
         user.id
       );
@@ -225,5 +274,73 @@ export const causeController = new Elysia({ prefix: "/causes" })
       auth: true,
       params: CauseParamsSchema,
       detail: { tags: ["Causes"], summary: "Deletar causa" },
+    }
+  )
+
+  .post(
+    "/:id/documents",
+    async ({ params, body, user }) => {
+      const { fileKey, fileName } = await storageService.uploadDocument(body.file);
+      return await causeService.attachDocument(params.id, user.id, fileKey, fileName, body.docType as any);
+    },
+    {
+      auth: true,
+      params: CauseParamsSchema,
+      body: AddDocumentSchema,
+      detail: { tags: ["Causes", "Documents"], summary: "Anexar documento de verificação" },
+    }
+  )
+
+  .get(
+    "/:id/documents",
+    async ({ params, user }) => {
+      const documents = await causeService.getDocuments(params.id, user.id);
+
+      return Promise.all(documents.map(async (doc) => ({
+        ...doc,
+        url: await storageService.getReadUrl(doc.fileKey)
+      })));
+    },
+    {
+      auth: true,
+      params: CauseParamsSchema,
+      detail: { tags: ["Causes", "Documents"], summary: "Listar documentos enviados da causa" },
+    }
+  )
+
+  .patch(
+    "/admin/documents/:docId/review",
+    async ({ params, body, user }) => {
+      return await causeService.reviewDocument(params.docId, body.status as any, user.id, body.rejectionReason);
+    },
+    {
+      auth: true,
+      params: t.Object({ docId: t.String() }),
+      body: ReviewDocumentSchema,
+      detail: { tags: ["Causes", "Admin"], summary: "Aprovar ou rejeitar documento" },
+    }
+  )
+
+  .get(
+    "/admin/pending",
+    async ({ user }) => {
+        return await causeService.getPendingCauses(user.id);
+    },
+    {
+      auth: true,
+      detail: { tags: ["Causes", "Admin"], summary: "Listar causas aguardando aprovação" },
+    }
+  )
+
+  .patch(
+    "/admin/:id/moderate",
+    async ({ params, body, user }) => {
+      return await causeService.moderateCause(params.id, body.status, body.isVerified, user.id);
+    },
+    {
+      auth: true,
+      params: CauseParamsSchema,
+      body: ModerateCauseSchema,
+      detail: { tags: ["Causes", "Admin"], summary: "Moderar causa (Mudar status e verificação)" },
     }
   );
