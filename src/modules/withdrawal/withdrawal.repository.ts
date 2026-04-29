@@ -2,12 +2,12 @@ import { PrismaClient, WithdrawalStatus } from "../../../generated/prisma/client
 import type { CreateWithdrawalData, IWithdrawalRepository } from "./withdrawal.types";
 
 const withdrawalInclude = {
-  cause: { select: { id: true, title: true, imageUrl: true } },
-  user:  { select: { id: true, name: true, image: true } },
+  cause: { select: { id: true, title: true, images: true } },
+  user: { select: { id: true, name: true, image: true } },
 } as const;
 
 export class WithdrawalRepository implements IWithdrawalRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) { }
 
   async create(data: CreateWithdrawalData) {
     return this.prisma.withdrawal.create({ data, include: withdrawalInclude });
@@ -19,7 +19,7 @@ export class WithdrawalRepository implements IWithdrawalRepository {
 
   async findByCause(causeId: string, skip = 0, take = 20) {
     return this.prisma.withdrawal.findMany({
-      where:   { causeId },
+      where: { causeId },
       skip,
       take,
       orderBy: { createdAt: "desc" },
@@ -29,7 +29,7 @@ export class WithdrawalRepository implements IWithdrawalRepository {
 
   async findByUser(userId: string, skip = 0, take = 20) {
     return this.prisma.withdrawal.findMany({
-      where:   { userId },
+      where: { userId },
       skip,
       take,
       orderBy: { createdAt: "desc" },
@@ -38,13 +38,13 @@ export class WithdrawalRepository implements IWithdrawalRepository {
   }
 
   async updateStatus(
-    id:     string,
+    id: string,
     status: WithdrawalStatus,
     extra?: { mpTransferId?: string; failReason?: string },
   ) {
     return this.prisma.withdrawal.update({
       where: { id },
-      data:  { status, ...extra },
+      data: { status, ...extra },
     });
   }
 }
