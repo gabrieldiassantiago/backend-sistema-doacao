@@ -55,7 +55,7 @@ export class PaymentService implements IPaymentService {
         payer:              { email: payerEmail },
         description:        `Doação para: ${cause.title}`,
         external_reference: payment.id,
-        notification_url: 'https://projeto-doacao-production.up.railway.app/payments/webhook'
+        notification_url: 'https://doacao.thankfulmeadow-f50cdd2d.eastus2.azurecontainerapps.io/payments/webhook'
       },
       requestOptions: { idempotencyKey: payment.id },
     });

@@ -10,7 +10,6 @@ const { paymentService } = container;
 export const paymentController = new Elysia({ prefix: "/payments" })
   .use(betterAuthMiddleware)
 
-  // Inicia um pagamento PIX — retorna QR Code para o usuário escanear
   .post(
     "/initiate",
     async ({ body, user, set }) => {
