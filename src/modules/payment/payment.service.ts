@@ -4,7 +4,6 @@ import type { IUserRepository } from "../user/user.types";
 import { mpPaymentClient } from "../../lib/mercadopago";
 import { NotFoundError, BadRequestError } from "../../errors/error-classes";
 import { ErrorCodes } from "../../errors/error-codes";
-import { container } from "../../container";
 import type {
   InitiatePaymentResult,
   IPaymentRepository,
@@ -13,6 +12,7 @@ import type {
   WebhookResult,
 } from "./payment.types";
 import type { InitiatePaymentDTO } from "./payment.schema";
+import { EmailQueueService } from "../../jobs/email-queue";
 
 export class PaymentService implements IPaymentService {
   constructor(
@@ -20,6 +20,7 @@ export class PaymentService implements IPaymentService {
     private readonly causeRepository:    ICauseRepository,
     private readonly userRepository:     IUserRepository,
     private readonly donationService:    IDonationService,
+    private readonly emailQueueService:  EmailQueueService,
   ) {}
 
   async initiatePayment(
@@ -45,6 +46,7 @@ export class PaymentService implements IPaymentService {
       userId,
       causeId:    data.causeId,
       payerEmail,
+      isAnonymous: data.isAnonymous,
     });
 
     // Chama o Mercado Pago para gerar o PIX
@@ -118,7 +120,7 @@ export class PaymentService implements IPaymentService {
             const cause = await this.causeRepository.findById(payment.causeId);
             
             if (user && cause && payment.payerEmail) {
-              await container.emailQueueService.enqueuePaymentFailed(payment.payerEmail, {
+              await this.emailQueueService.enqueuePaymentFailed(payment.payerEmail, {
                 userName: user.name,
                 causeTitle: cause.title,
                 amount: payment.amount,
@@ -142,6 +144,7 @@ export class PaymentService implements IPaymentService {
       message: payment.message,
       userId:  payment.userId,
       causeId: payment.causeId,
+      isAnonymous: payment.isAnonymous,
     });
 
     try {
@@ -149,7 +152,7 @@ export class PaymentService implements IPaymentService {
       const cause = await this.causeRepository.findById(payment.causeId);
       
       if (user && cause && payment.payerEmail) {
-        await container.emailQueueService.enqueueDonationConfirmation(payment.payerEmail, {
+        await this.emailQueueService.enqueueDonationConfirmation(payment.payerEmail, {
           userName: user.name,
           causeTitle: cause.title,
           amount: payment.amount,
