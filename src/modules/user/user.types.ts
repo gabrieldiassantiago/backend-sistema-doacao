@@ -1,5 +1,14 @@
 import type { BadgeKey, Prisma, User } from "../../../generated/prisma/client";
 
+type CauseImageRef = {
+  id: string;
+  causeId: string;
+  key: string;
+  position: number;
+  createdAt: Date;
+  url?: string | null;
+};
+
 export type UserProfile = {
   id:        string;
   name:      string;
@@ -20,17 +29,18 @@ export type UserProfile = {
     cause: {
       id:       string;
       title:    string;
-      imageUrl: string | null;
+      images:   CauseImageRef[];
     };
   }[];
   createdCauses: {
     id:         string;
     title:      string;
-    imageUrl:   string | null;
+    images:     CauseImageRef[];
     goalAmount: number;
     raised:     number;
     status:     string;
     createdAt:  Date;
+    balance:    number;
   }[];
   _count: {
     donations:     number;

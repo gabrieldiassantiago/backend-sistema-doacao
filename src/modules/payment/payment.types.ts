@@ -6,6 +6,7 @@ export type CreatePaymentData = {
   userId:     string;
   causeId:    string;
   payerEmail: string;
+  isAnonymous?: boolean;
 };
 
 export type PaymentStatusValue = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";

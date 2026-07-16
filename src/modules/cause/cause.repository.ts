@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Cause } from "../../../generated/prisma/client";
+import { PrismaClient, Prisma, Cause, DocStatus } from "../../../generated/prisma/client";
 import type { ICauseRepository, CauseWithRelations, CauseFilterParams } from "./cause.types";
 
 const CAUSE_INCLUDE = {
@@ -18,6 +18,9 @@ const CAUSE_INCLUDE = {
 } satisfies Prisma.CauseInclude;
 
 export class CauseRepository implements ICauseRepository {
+
+  private static PAGE_SIZE = 12; //limita resultados por pagina
+
   constructor(private readonly prisma: PrismaClient) { }
 
   async create(
@@ -45,24 +48,16 @@ export class CauseRepository implements ICauseRepository {
     });
   }
 
-  /**
-   * Lista causas ativas com suporte a filtros, ordenação e paginação.
-   *
-   * Quando `sort = "nearest"` e `lat`/`lng` são fornecidos, usa a fórmula de
-   * Haversine via SQL raw para calcular a distância em km e retornar apenas
-   * as causas dentro do raio especificado (padrão 50 km), ordenadas por
-   * proximidade crescente.
-   */
   async findActiveCauses(filters: CauseFilterParams = {}): Promise<CauseWithRelations[]> {
-    const { skip = 0, take = 20, sort, city, state, lat, lng, radius = 50, categoryId, search } =
+    const { skip = 0, take = CauseRepository.PAGE_SIZE, sort, city, state, lat, lng, radius = 50, categoryId, search } =
       filters;
 
-    // ── Filtro de proximidade por GPS (Haversine) ──────────────────────────
+    const limitedTake = Math.min(take || CauseRepository.PAGE_SIZE, CauseRepository.PAGE_SIZE);
+
     if (sort === "nearest" && lat !== undefined && lng !== undefined) {
-      return this.findNearestCauses({ lat, lng, radius, skip, take, city, state, categoryId, search });
+      return this.findNearestCauses({ lat, lng, radius, skip, take: limitedTake, city, state, categoryId, search });
     }
 
-    // ── Filtros Prisma normais ─────────────────────────────────────────────
     const where: Prisma.CauseWhereInput = {
       status: "ACTIVE",
       ...(city && { city: { contains: city, mode: "insensitive" } }),
@@ -76,24 +71,20 @@ export class CauseRepository implements ICauseRepository {
       }),
     };
 
-    // ── Ordenação ──────────────────────────────────────────────────────────
     let orderBy: Prisma.CauseOrderByWithRelationInput | Prisma.CauseOrderByWithRelationInput[];
 
     if (sort === "most_popular") {
-      // mais doações primeiro
       orderBy = { donations: { _count: "desc" } };
     } else if (sort === "most_urgent") {
-      // menor arrecadação (absoluta) primeiro — causas mais longe da meta
       orderBy = [{ raised: "asc" }, { goalAmount: "desc" }];
     } else {
-      // padrão: mais recentes
       orderBy = { createdAt: "desc" };
     }
 
     return this.prisma.cause.findMany({
       where,
       skip,
-      take,
+      take: limitedTake,
       orderBy,
       include: CAUSE_INCLUDE,
     });
@@ -107,15 +98,6 @@ export class CauseRepository implements ICauseRepository {
     });
   }
 
-  /**
-   * Busca causas ordenadas por distância usando a fórmula de Haversine
-   * diretamente no PostgreSQL.
-   *
-   * Estratégia em dois passos para contornar a limitação do `$queryRaw`
-   * (não retorna relations do Prisma):
-   *  1. Obtém os IDs ordenados por distância via SQL raw.
-   *  2. Busca as causas completas pelo `findMany` respeitando a ordem original.
-   */
   private async findNearestCauses(params: {
     lat: number;
     lng: number;
@@ -127,9 +109,9 @@ export class CauseRepository implements ICauseRepository {
     categoryId?: string;
     search?: string;
   }): Promise<CauseWithRelations[]> {
-    const { lat, lng, radius, skip, take, city, state, categoryId, search } = params;
+    const { lat, lng, radius, skip, city, state, categoryId, search } = params;
+    const limitedTake = Math.min(params.take, CauseRepository.PAGE_SIZE);
 
-    // Passo 1: IDs ordenados por distância via Haversine
     type RawRow = { id: string; distance_km: number };
 
     const raw = await this.prisma.$queryRaw<RawRow[]>`
@@ -164,7 +146,7 @@ export class CauseRepository implements ICauseRepository {
       FROM ranked
       WHERE distance_km <= ${radius}
       ORDER BY distance_km ASC
-      LIMIT ${take}
+      LIMIT ${limitedTake}
       OFFSET ${skip}
     `;
 
@@ -173,13 +155,12 @@ export class CauseRepository implements ICauseRepository {
     const orderedIds = raw.map((r) => r.id);
     const distanceMap = new Map(raw.map((r) => [r.id, r.distance_km]));
 
-    // Passo 2: busca com relations via Prisma
+
     const causes = await this.prisma.cause.findMany({
       where: { id: { in: orderedIds } },
       include: CAUSE_INCLUDE,
     });
 
-    // Reordena para respeitar a ordem de distância retornada pelo SQL
     causes.sort(
       (a, b) => (distanceMap.get(a.id) ?? Infinity) - (distanceMap.get(b.id) ?? Infinity)
     );
@@ -237,7 +218,7 @@ export class CauseRepository implements ICauseRepository {
     });
   }
 
-  async updateDocumentStatus(id: string, status: any, rejectionReason?: string) {
+  async updateDocumentStatus(id: string, status: DocStatus, rejectionReason?: string) {
     return this.prisma.causeDocument.update({
       where: { id },
       data: { status, rejectionReason }
