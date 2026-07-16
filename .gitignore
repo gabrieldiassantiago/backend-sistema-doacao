@@ -42,3 +42,12 @@ yarn-error.log*
 **/*.log
 package-lock.json
 **/*.bun
+firebase-key.json
+
+# AI agents
+.claude
+.openclaude
+
+# environment variables
+.env
+.env.railway
