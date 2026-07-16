@@ -1,15 +1,18 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { ConfiguredRetryStrategy } from "@smithy/util-retry";
+import { S3Client, type S3File } from "bun";
 import pLimit from "p-limit";
+
+/**
+ * Tamanho a partir do qual usamos multipart upload (writer com partes paralelas).
+ * Abaixo disso fazemos um único PUT, que é mais rápido para arquivos pequenos.
+ */
+const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5 MB
 
 export class S3StorageService {
   private readonly bucketName: string;
   private readonly endpoint: URL;
   private readonly storage: S3Client;
   private readonly signedUrlExpiresIn: number;
-  private readonly uploadLimit = pLimit(5);
-
+  private readonly uploadLimit: ReturnType<typeof pLimit>;
 
   constructor() {
     const bucketName = process.env.S3_BUCKET ?? process.env.AWS_S3_BUCKET;
@@ -18,114 +21,169 @@ export class S3StorageService {
     const accessKeyId = process.env.S3_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID;
     const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
     const expiresIn = Number.parseInt(process.env.S3_SIGNED_URL_EXPIRES_IN ?? "3600", 10);
+    const concurrency = Number.parseInt(process.env.S3_UPLOAD_CONCURRENCY ?? "10", 10);
 
     if (!bucketName || !endpoint || !accessKeyId || !secretAccessKey) {
       throw new Error(
-        "Missing S3 storage configuration. Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY."
+        "Missing S3 storage configuration. Set S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY.",
       );
     }
 
     this.bucketName = bucketName;
     this.endpoint = new URL(endpoint);
-    this.signedUrlExpiresIn = Number.isFinite(expiresIn) && expiresIn > 0
-      ? Math.min(expiresIn, 7_776_000)
-      : 3600;
-  this.storage = new S3Client({
-  endpoint: this.endpoint.toString(),
-  region,
-  forcePathStyle: false,
-  credentials: { accessKeyId, secretAccessKey },
-  maxAttempts: 5,
-  retryStrategy: new ConfiguredRetryStrategy(
-    5,
-    (attempt) => 200 + attempt * 500 
-  ),
-});
+    this.signedUrlExpiresIn =
+      Number.isFinite(expiresIn) && expiresIn > 0 ? Math.min(expiresIn, 7_776_000) : 3600;
+    this.uploadLimit = pLimit(Number.isFinite(concurrency) && concurrency > 0 ? concurrency : 10);
+
+    this.storage = new S3Client({
+      bucket: bucketName,
+      endpoint: this.endpoint.toString(),
+      region,
+      accessKeyId,
+      secretAccessKey,
+    });
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // UPLOAD
+  // ──────────────────────────────────────────────────────────────────────────
 
-async uploadImages(files: File[]): Promise<string[]> {
-  return Promise.all(
-    files.map((file) => this.uploadLimit(() => this.uploadSingleImage(file)))
-  );
-}
-
-  async uploadDocument(file: File): Promise<{ fileKey: string, fileName: string }> {
-    const fileExtension = this.getFileExtension(file.name);
-    const fileName = `${crypto.randomUUID()}.${fileExtension}`;
-    const objectKey = `documents/${fileName}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    await this.storage.send(
-      new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: objectKey,
-        Body: buffer,
-        ContentType: file.type || "application/octet-stream",
-      })
+  async uploadImages(files: File[]): Promise<string[]> {
+    return Promise.all(
+      files.map((file) =>
+        this.uploadLimit(() => this.uploadSingle(file, "causes")),
+      ),
     );
-
-    return { fileKey: objectKey, fileName: file.name };
   }
 
-  async getReadUrl(fileKeyOrUrl: string): Promise<string> {
+  async uploadSuggestionImages(files: File[]): Promise<string[]> {
+    return Promise.all(
+      files.map((file) =>
+        this.uploadLimit(() => this.uploadSingle(file, "suggestions")),
+      ),
+    );
+  }
+
+  async uploadDocument(file: File): Promise<{ fileKey: string; fileName: string }> {
+    const fileKey = await this.uploadSingle(file, "documents");
+    return { fileKey, fileName: file.name };
+  }
+
+  async uploadUserAvatar(file: File): Promise<string> {
+    return this.uploadSingle(file, "users");
+  }
+
+  /**
+   * Gera uma URL presigned para upload direto do browser (PUT).
+   * Permite que o browser envie o arquivo direto pro S3/R2 sem passar
+   * pelo servidor — é o caminho mais rápido para uploads grandes.
+   */
+  presignUpload(
+    filename: string,
+    contentType: string,
+    folder: "causes" | "documents" | "suggestions" | "users" = "causes",
+    expiresIn = 300,
+  ): { url: string; key: string } {
+    const ext = this.getFileExtension(filename);
+    const key = `${folder}/${crypto.randomUUID()}.${ext}`;
+    const url = this.storage.presign(key, {
+      method: "PUT",
+      expiresIn,
+      type: contentType,
+    });
+    return { url, key };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // READ
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Versão síncrona da geração de URL de leitura.
+   * `Bun.S3Client.presign()` é síncrono e baratíssimo, então pode ser chamado
+   * em loops e map() sem custo perceptível.
+   */
+  presignRead(fileKeyOrUrl: string, expiresIn = this.signedUrlExpiresIn): string {
     if (this.isHttpUrl(fileKeyOrUrl)) {
       const fileUrl = new URL(fileKeyOrUrl);
-
       if (!this.isManagedStorageUrl(fileUrl)) {
         return fileKeyOrUrl;
       }
     }
 
     const objectKey = this.extractObjectKey(fileKeyOrUrl);
+    return this.storage.presign(objectKey, { method: "GET", expiresIn });
+  }
 
-    return getSignedUrl(
-      this.storage as any,
-      new GetObjectCommand({
-        Bucket: this.bucketName,
-        Key: objectKey,
-      }) as any,
-      { expiresIn: this.signedUrlExpiresIn }
-    );
+  /** Mantida assíncrona para compatibilidade com chamadas existentes. */
+  async getReadUrl(fileKeyOrUrl: string): Promise<string> {
+    return this.presignRead(fileKeyOrUrl);
   }
 
   async getReadUrls(fileKeysOrUrls: string[]): Promise<string[]> {
-    return Promise.all(fileKeysOrUrls.map((fileKeyOrUrl) => this.getReadUrl(fileKeyOrUrl)));
+    return fileKeysOrUrls.map((k) => this.presignRead(k));
   }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // DELETE
+  // ──────────────────────────────────────────────────────────────────────────
 
   async deleteFile(fileKeyOrUrl: string): Promise<void> {
     if (this.isHttpUrl(fileKeyOrUrl)) {
       const fileUrl = new URL(fileKeyOrUrl);
-
-      if (!this.isManagedStorageUrl(fileUrl)) {
-        return;
-      }
+      if (!this.isManagedStorageUrl(fileUrl)) return;
     }
 
     const objectKey = this.extractObjectKey(fileKeyOrUrl);
-
-    await this.storage.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: objectKey,
-      })
-    );
+    await this.storage.delete(objectKey);
   }
 
-  private async uploadSingleImage(file: File): Promise<string> {
-    const fileExtension = this.getFileExtension(file.name);
-    const fileName = `${crypto.randomUUID()}.${fileExtension}`;
-    const objectKey = `causes/${fileName}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
+  // ──────────────────────────────────────────────────────────────────────────
+  // INTERNALS
+  // ──────────────────────────────────────────────────────────────────────────
 
-    await this.storage.send(
-      new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: objectKey,
-        Body: buffer,
-        ContentType: file.type || "application/octet-stream",
-      })
-    );
+  private async uploadSingle(
+    file: File,
+    folder: "causes" | "documents" | "suggestions" | "users",
+  ): Promise<string> {
+    const ext = this.getFileExtension(file.name);
+    const objectKey = `${folder}/${crypto.randomUUID()}.${ext}`;
+    const contentType = file.type || "application/octet-stream";
+    const s3file: S3File = this.storage.file(objectKey);
+
+    if (file.size <= MULTIPART_THRESHOLD) {
+      // Caminho rápido para arquivos pequenos: um único PUT.
+      // O Bun aceita File/Blob direto, sem precisar materializar o ArrayBuffer.
+      await s3file.write(file, { type: contentType });
+      return objectKey;
+    }
+
+    // Multipart com partes paralelas para arquivos grandes.
+    // Streaming evita carregar o arquivo inteiro na RAM.
+    const writer = s3file.writer({
+      type: contentType,
+      partSize: 5 * 1024 * 1024,
+      queueSize: 4,
+      retry: 3,
+    });
+
+    const reader = file.stream().getReader();
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        writer.write(value);
+      }
+      await writer.end();
+    } catch (err) {
+      try {
+        await writer.end();
+      } catch {
+        /* ignore */
+      }
+      throw err;
+    }
 
     return objectKey;
   }
@@ -146,7 +204,6 @@ async uploadImages(files: File[]): Promise<string[]> {
     const endpointHost = this.endpoint.host.toLowerCase();
     const bucketHost = `${this.bucketName.toLowerCase()}.${endpointHost}`;
     const fileHost = fileUrl.host.toLowerCase();
-
     return fileHost === endpointHost || fileHost === bucketHost;
   }
 

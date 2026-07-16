@@ -8,6 +8,8 @@ import PaymentFailedEmail from "../emails/payment-failed";
 import { ExternalServiceError, InternalError } from "../errors/error-classes";
 import { ErrorCodes } from "../errors/error-codes";
 import CauseApprovalEmail from "../emails/cause-approval";
+import CauseUnderReviewEmail from "../emails/cause-under-review";
+import SuggestionReviewedEmail from "../emails/suggestion-reviewed";
 
 export type DonationConfirmationEmailParams = {
   userName: string;
@@ -24,11 +26,30 @@ export type PaymentFailedEmailParams = {
   amount: number;
 };
 
+export type CauseUnderReviewEmailParams = {
+  userName: string;
+  causeTitle: string;
+};
+
+export type CauseApprovalEmailParams = {
+  userName: string;
+  causeTitle: string;
+};
+
+export type SuggestionReviewedEmailParams = {
+  userName: string;
+  pointName: string;
+  status: 'APPROVED' | 'REJECTED';
+  adminNote?: string;
+};
+
 export interface IMailer {
   sendOTPEmail(to: string, otp: string, userName: string): Promise<void>;
   sendDonationConfirmationEmail(to: string, params: DonationConfirmationEmailParams): Promise<void>;
   sendPaymentFailedEmail(to: string, params: PaymentFailedEmailParams): Promise<void>;
-  sendCauseApprovalEmail(to: string, causeTitle: string): Promise<void>;
+  sendCauseApprovalEmail(to: string, params: CauseApprovalEmailParams): Promise<void>;
+  sendCauseUnderReviewEmail(to: string, params: CauseUnderReviewEmailParams): Promise<void>;
+  sendSuggestionReviewedEmail(to: string, params: SuggestionReviewedEmailParams): Promise<void>;
 }
 
 export class ResendMailer implements IMailer {
@@ -104,12 +125,39 @@ export class ResendMailer implements IMailer {
 
   async sendCauseApprovalEmail(
     to: string,
-    causeTitle: string,
+    params: CauseApprovalEmailParams,
   ): Promise<void> {
     const html = renderToStaticMarkup(
-      React.createElement(CauseApprovalEmail, { causeTitle }),
+      React.createElement(CauseApprovalEmail, params),
     );
     await this.send(to, "Olá! Sua causa foi aprovada!", html);
+  }
+
+  async sendCauseUnderReviewEmail(
+    to: string,
+    params: CauseUnderReviewEmailParams,
+  ): Promise<void> {
+    const html = renderToStaticMarkup(
+      React.createElement(CauseUnderReviewEmail, params),
+    );
+
+    await this.send(to, "Sua causa está em análise pela curadoria", html);
+  }
+
+  async sendSuggestionReviewedEmail(
+    to: string,
+    params: SuggestionReviewedEmailParams,
+  ): Promise<void> {
+    const subject =
+      params.status === 'APPROVED'
+        ? '✅ Sua sugestão de ponto de coleta foi aprovada!'
+        : '📋 Atualização sobre sua sugestão de ponto de coleta';
+
+    const html = renderToStaticMarkup(
+      React.createElement(SuggestionReviewedEmail, params),
+    );
+
+    await this.send(to, subject, html);
   }
 }
 
@@ -148,7 +196,21 @@ export async function sendPaymentFailedEmail(
 
 export async function sendCauseApprovalEmail(
   to: string,
-  causeTitle: string,
+  params: CauseApprovalEmailParams,
 ): Promise<void> {
-  return getMailer().sendCauseApprovalEmail(to, causeTitle);
+  return getMailer().sendCauseApprovalEmail(to, params);
+}
+
+export async function sendCauseUnderReviewEmail(
+  to: string,
+  params: CauseUnderReviewEmailParams,
+): Promise<void> {
+  return getMailer().sendCauseUnderReviewEmail(to, params);
+}
+
+export async function sendSuggestionReviewedEmail(
+  to: string,
+  params: SuggestionReviewedEmailParams,
+): Promise<void> {
+  return getMailer().sendSuggestionReviewedEmail(to, params);
 }

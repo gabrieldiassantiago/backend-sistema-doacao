@@ -9,30 +9,37 @@ import { donationController } from "./modules/donation/donation.controller";
 import { paymentController } from "./modules/payment/payment.controller";
 import { withdrawalController } from "./modules/withdrawal/withdrawal.controller";
 import { collectionPointController } from "./modules/collection-points/collection-points.controller";
+import { suggestionController } from "./modules/collection-points/suggestion/suggestion.controller";
 import { withdrawalApprovalJob } from "./modules/withdrawal/jobs/withdrawal.job";
 import logixlysia from "logixlysia";
 import { errorHandler } from "./plugins/error-handler";
+import { container } from "./container";
+import { paymentJobs, checkPendingPayments } from "./jobs/payments-jobs";
 
 export class AppBootstrapper {
   private app: any;
 
   async bootstrap(): Promise<void> {
     this.app = new Elysia()
-    
+
       .use(cors({
         origin: [
           "https://doacao-frontend-swart.vercel.app",
-          "http://localhost:3001"
+          "http://localhost:3001",
+          "https://doacao-frontend-amber.vercel.app"
         ],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization"],
       }))
 
+      .use(paymentJobs)
+
+
       .use(errorHandler)
       .mount(auth.handler)
 
-      // proteção do /docs
+
       .onBeforeHandle(({ request, set, path }) => {
         if (!path.startsWith("/docs")) return;
 
@@ -95,13 +102,19 @@ export class AppBootstrapper {
       .use(donationController)
       .use(paymentController)
       .use(withdrawalController)
-      .use(collectionPointController);
+      .use(collectionPointController)
+      .use(suggestionController);
   }
 
   async start(port: number = 3000): Promise<void> {
     await this.bootstrap();
     this.app.listen(port);
-    withdrawalApprovalJob.start();
+    //withdrawalApprovalJob.start();
+
+    container.emailQueueService.startWorker();
+
+    // Roda a verificação de pagamentos imediatamente no start
+    void checkPendingPayments();
 
     console.log(
       `Servidor rodando em: http://${this.app.server?.hostname}:${this.app.server?.port}`
@@ -109,7 +122,7 @@ export class AppBootstrapper {
     console.log(
       `doc em http://${this.app.server?.hostname}:${this.app.server?.port}/docs`
     );
-  } 
+  }
 
   getApp(): any {
     return this.app;

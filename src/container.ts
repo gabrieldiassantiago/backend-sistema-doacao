@@ -7,6 +7,7 @@ import { DonationRepository } from "./modules/donation/donation.repository";
 import { PaymentRepository } from "./modules/payment/payment.repository";
 import { WithdrawalRepository } from "./modules/withdrawal/withdrawal.repository";
 import { CollectionPointRepository } from "./modules/collection-points/collection-points.repository";
+import { SuggestionRepository } from "./modules/collection-points/suggestion/suggestion.repository";
 
 import { CauseService } from "./modules/cause/cause.service";
 import { CategoryService } from "./modules/category/category.service";
@@ -15,6 +16,7 @@ import { DonationService } from "./modules/donation/donation.service";
 import { PaymentService } from "./modules/payment/payment.service";
 import { WithdrawalService } from "./modules/withdrawal/withdrawal.service";
 import { CollectionPointService } from "./modules/collection-points/colleciton-points.service";
+import { SuggestionService } from "./modules/collection-points/suggestion/suggestion.service";
 import { S3StorageService } from "./lib/s3";
 import { EmailQueueService } from "./jobs/email-queue";
 import { getMailer } from "./lib/mailer";
@@ -27,6 +29,7 @@ export type AppContainer = {
   paymentRepository: PaymentRepository;
   withdrawalRepository: WithdrawalRepository;
   collectionPointRepository: CollectionPointRepository;
+  suggestionRepository: SuggestionRepository;
   causeService: CauseService;
   categoryService: CategoryService;
   userService: UserService;
@@ -34,6 +37,7 @@ export type AppContainer = {
   paymentService: PaymentService;
   withdrawalService: WithdrawalService;
   collectionPointService: CollectionPointService;
+  suggestionService: SuggestionService;
   storageService: S3StorageService;
   emailQueueService: EmailQueueService;
 };
@@ -50,6 +54,8 @@ export function createContainer(overrides: ContainerOverrides = {}): AppContaine
   const withdrawalRepository = overrides.withdrawalRepository ?? new WithdrawalRepository(prisma);
   const collectionPointRepository =
     overrides.collectionPointRepository ?? new CollectionPointRepository(prisma);
+  const suggestionRepository =
+    overrides.suggestionRepository ?? new SuggestionRepository(prisma);
 
   // Infra services (precisam vir antes dos services que dependem deles)
   const storageService = overrides.storageService ?? new S3StorageService();
@@ -69,14 +75,24 @@ export function createContainer(overrides: ContainerOverrides = {}): AppContaine
 
   const paymentService =
     overrides.paymentService ??
-    new PaymentService(paymentRepository, causeRepository, userRepository, donationService);
-
+    new PaymentService(paymentRepository, causeRepository, userRepository, donationService, emailQueueService);
+  
   const withdrawalService =
     overrides.withdrawalService ??
     new WithdrawalService(withdrawalRepository, causeRepository, prisma);
 
   const collectionPointService =
     overrides.collectionPointService ?? new CollectionPointService(collectionPointRepository);
+
+  const suggestionService =
+    overrides.suggestionService ??
+    new SuggestionService(
+      suggestionRepository,
+      collectionPointRepository,
+      userRepository,
+      storageService,
+      emailQueueService,
+    );
 
   return {
     causeRepository,
@@ -86,6 +102,7 @@ export function createContainer(overrides: ContainerOverrides = {}): AppContaine
     paymentRepository,
     withdrawalRepository,
     collectionPointRepository,
+    suggestionRepository,
     causeService,
     categoryService,
     userService,
@@ -93,6 +110,7 @@ export function createContainer(overrides: ContainerOverrides = {}): AppContaine
     paymentService,
     withdrawalService,
     collectionPointService,
+    suggestionService,
     storageService,
     emailQueueService,
   };

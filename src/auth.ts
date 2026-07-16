@@ -18,16 +18,26 @@ export const auth = betterAuth({
                 required: true,
                 defaultValue: false,
             }
+        },
+        changeEmail: {
+            enabled: true,
+        }
+    },
+
+    socialProviders: {
+        google: {
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         }
     },
 
 
-    trustedOrigins: ["https://doacao-frontend-swart.vercel.app", "http://localhost:3001"],
+    trustedOrigins: ["https://doacao-frontend-swart.vercel.app", "http://localhost:3001", "https://doacao-frontend-amber.vercel.app"],
     emailAndPassword: {
         enabled: true,
         autoSignIn: false,
         requireEmailVerification: true,
-        
+
         sendResetPassword: async ({ user, url, token }, request) => {
             await container.emailQueueService.enqueueResetPassword(user.email, token, user.name);
         },
@@ -37,7 +47,7 @@ export const auth = betterAuth({
 
     advanced: {
         defaultCookieAttributes: {
-            sameSite: "lax",
+            sameSite: "none",
             secure: true,
             httpOnly: true,
         },
