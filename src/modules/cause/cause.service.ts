@@ -4,6 +4,7 @@ import type {
     ICauseService,
     CauseFilterParams,
     CauseWithRelations,
+    CauseWithDonationCount,
     CauseDocument,
     CauseDocumentWithUrl,
     CauseCreateData,
@@ -26,12 +27,18 @@ export class CauseService implements ICauseService {
         private readonly emailQueueService: EmailQueueService,
     ) { }
 
-    private withImageUrls(cause: CauseWithRelations): CauseWithRelations {
-        if (!cause.images?.length) return cause;
+    private withImageUrls(cause: CauseWithRelations): CauseWithDonationCount {
+        const { _count, ...rest } = cause;
+        const causeWithDonationCount = {
+            ...rest,
+            donationsCount: _count?.donations ?? 0,
+        };
+
+        if (!causeWithDonationCount.images?.length) return causeWithDonationCount;
 
         return {
-            ...cause,
-            images: cause.images.map((img) => ({
+            ...causeWithDonationCount,
+            images: causeWithDonationCount.images.map((img) => ({
                 ...img,
                 url: this.storage.presignRead(img.key),
             })),

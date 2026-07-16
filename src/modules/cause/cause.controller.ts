@@ -1,7 +1,7 @@
 import Elysia, { t } from "elysia";
 import { betterAuthMiddleware } from "../../middleware/auth";
 import { container } from "../../container";
-import { ForbiddenError, NotFoundError } from "../../errors/error-classes";
+import { NotFoundError } from "../../errors/error-classes";
 import { ErrorCodes } from "../../errors/error-codes";
 import {
   CauseParamsSchema,
@@ -10,66 +10,12 @@ import {
   GetCausesQuerySchema,
   AddDocumentSchema,
   ReviewDocumentSchema,
-  ModerateCauseSchema
+  ModerateCauseSchema,
 } from "./cause.schema";
-
 
 const { causeService, storageService } = container;
 
-type CauseWithImages = {
-  id: string;
-  title: string;
-  description: string;
-  goalAmount: number;
-  raised: number;
-  status: string;
-  isVerified: boolean;
-  isFeatured: boolean;
-  authorId: string;
-  categoryId: string | null;
-  balance: number;
-  isGoalReached: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  author?: {
-    id: string;
-    name: string;
-    image: string | null;
-  };
-  category?: {
-    id: string;
-    name: string;
-    description: string | null;
-  } | null;
-  images: {
-    id: string;
-    key: string;
-    position: number;
-    createdAt: Date;
-  }[];
-  _count?: {
-    donations: number;
-  };
-};
-
-const withSignedImages = async <T extends CauseWithImages>(cause: T) => {
-  const imageKeys = cause.images?.map((image) => image.key) ?? [];
-  const signedUrls = await storageService.getReadUrls(imageKeys);
-
-  return {
-    ...cause,
-    images: cause.images.map((image, index) => ({
-      id: image.id,
-      key: image.key,
-      position: image.position,
-      createdAt: image.createdAt,
-      url: signedUrls[index] ?? null,
-    })),
-  };
-};
-
 export const causeController = new Elysia({ prefix: "/causes" })
-
   .use(betterAuthMiddleware)
 
   .get(
@@ -99,7 +45,7 @@ export const causeController = new Elysia({ prefix: "/causes" })
         }ms. Total: ${causes.length} causas. sort=${query.sort ?? "recent"}`
       );
 
-      return Promise.all(causes.map((cause) => withSignedImages(cause)));
+      return causes;
     },
     {
       query: GetCausesQuerySchema,
@@ -107,19 +53,19 @@ export const causeController = new Elysia({ prefix: "/causes" })
         tags: ["Causes"],
         summary: "Listar causas ativas com filtros",
         description: [
-          "Retorna causas ativas com suporte a filtros e ordenação.",
+          "Retorna causas ativas com suporte a filtros e ordenacao.",
           "",
-          "**Ordenação (`sort`)**:",
-          "- `recent` — mais recentes primeiro (padrão)",
-          "- `most_popular` — maior número de doações primeiro",
-          "- `most_urgent` — menor arrecadação primeiro (maior necessidade)",
-          "- `nearest` — mais próximas do usuário (requer `lat` e `lng`)",
+          "**Ordenacao (`sort`)**:",
+          "- `recent` - mais recentes primeiro (padrao)",
+          "- `most_popular` - maior numero de doacoes primeiro",
+          "- `most_urgent` - menor arrecadacao primeiro (maior necessidade)",
+          "- `nearest` - mais proximas do usuario (requer `lat` e `lng`)",
           "",
-          "**Filtro por localização**:",
-          "- `city` / `state` — texto parcial, case-insensitive",
-          "- `lat` + `lng` + `radius` — coordenadas do usuário em graus decimais e raio em km (padrão 50 km)",
+          "**Filtro por localizacao**:",
+          "- `city` / `state` - texto parcial, case-insensitive",
+          "- `lat` + `lng` + `radius` - coordenadas do usuario em graus decimais e raio em km (padrao 50 km)",
           "",
-          "**Exemplo — perto de Recife num raio de 30 km**:",
+          "**Exemplo - perto de Recife num raio de 30 km**:",
           "```",
           "GET /causes?sort=nearest&lat=-8.0476&lng=-34.8770&radius=30",
           "```",
@@ -128,7 +74,6 @@ export const causeController = new Elysia({ prefix: "/causes" })
     }
   )
 
-
   .get(
     "/:id",
     async ({ params }) => {
@@ -136,19 +81,18 @@ export const causeController = new Elysia({ prefix: "/causes" })
 
       if (!cause) {
         throw new NotFoundError(
-          "Causa não encontrada",
+          "Causa nao encontrada",
           ErrorCodes.CAUSE_NOT_FOUND
         );
       }
 
-      return withSignedImages(cause);
+      return cause;
     },
     {
       params: CauseParamsSchema,
       detail: { tags: ["Causes"], summary: "Buscar causa por ID" },
     }
   )
-
 
   .post(
     "/",
@@ -181,9 +125,16 @@ export const causeController = new Elysia({ prefix: "/causes" })
         user.id
       );
 
-      pino.info({ causeId: createdCause.id, duration: Date.now() - startTime, images: uploadedImageKeys.length }, "Causa criada com sucesso");
+      pino.info(
+        {
+          causeId: createdCause.id,
+          duration: Date.now() - startTime,
+          images: uploadedImageKeys.length,
+        },
+        "Causa criada com sucesso"
+      );
 
-      return withSignedImages(createdCause);
+      return createdCause;
     },
     {
       auth: true,
@@ -191,51 +142,11 @@ export const causeController = new Elysia({ prefix: "/causes" })
       detail: { tags: ["Causes"], summary: "Criar nova causa" },
     }
   )
+
   .patch(
     "/:id",
     async ({ params, body, user }) => {
-      const cause = await causeService.getCauseById(params.id);
-
-      if (!cause) {
-        throw new NotFoundError(
-          "Causa não encontrada",
-          ErrorCodes.CAUSE_NOT_FOUND
-        );
-      }
-
-      if (cause.authorId !== user.id) {
-        throw new ForbiddenError(
-          "Você não tem permissão para atualizar esta causa",
-          ErrorCodes.FORBIDDEN
-        );
-      }
-
-      const currentImageKeys = cause.images.map((image) => image.key);
-
-      const reorderedExistingKeys = body.imageKeys ?? currentImageKeys;
-
-      const hasInvalidKey = reorderedExistingKeys.some(
-        (key) => !currentImageKeys.includes(key)
-      );
-
-      if (hasInvalidKey) {
-        throw new ForbiddenError(
-          "Uma ou mais imagens enviadas não pertencem a esta causa",
-          ErrorCodes.FORBIDDEN
-        );
-      }
-
-      const uploadedImageKeys =
-        body.images && body.images.length > 0
-          ? await storageService.uploadImages(body.images)
-          : [];
-
-      const finalImageKeys =
-        body.imageKeys || uploadedImageKeys.length > 0
-          ? [...reorderedExistingKeys, ...uploadedImageKeys]
-          : undefined;
-
-      const updatedCause = await causeService.updateCause(
+      return await causeService.updateCause(
         params.id,
         {
           title: body.title,
@@ -243,7 +154,9 @@ export const causeController = new Elysia({ prefix: "/causes" })
           goalAmount: body.goalAmount,
           categoryId: body.categoryId,
           isFeatured: body.isFeatured,
-          imageKeys: finalImageKeys,
+          status: body.status,
+          imageKeys: body.imageKeys,
+          images: body.images,
           locationName: body.locationName,
           address: body.address,
           city: body.city,
@@ -254,8 +167,6 @@ export const causeController = new Elysia({ prefix: "/causes" })
         },
         user.id
       );
-
-      return withSignedImages(updatedCause);
     },
     {
       auth: true,
@@ -281,25 +192,20 @@ export const causeController = new Elysia({ prefix: "/causes" })
     "/:id/documents",
     async ({ params, body, user }) => {
       const { fileKey, fileName } = await storageService.uploadDocument(body.file);
-      return await causeService.attachDocument(params.id, user.id, fileKey, fileName, body.docType as any);
+      return await causeService.attachDocument(params.id, user.id, fileKey, fileName, body.docType);
     },
     {
       auth: true,
       params: CauseParamsSchema,
       body: AddDocumentSchema,
-      detail: { tags: ["Causes", "Documents"], summary: "Anexar documento de verificação" },
+      detail: { tags: ["Causes", "Documents"], summary: "Anexar documento de verificacao" },
     }
   )
 
   .get(
     "/:id/documents",
     async ({ params, user }) => {
-      const documents = await causeService.getDocuments(params.id, user.id);
-
-      return Promise.all(documents.map(async (doc) => ({
-        ...doc,
-        url: await storageService.getReadUrl(doc.fileKey)
-      })));
+      return await causeService.getDocuments(params.id, user.id);
     },
     {
       auth: true,
@@ -311,7 +217,7 @@ export const causeController = new Elysia({ prefix: "/causes" })
   .patch(
     "/admin/documents/:docId/review",
     async ({ params, body, user }) => {
-      return await causeService.reviewDocument(params.docId, body.status as any, user.id, body.rejectionReason);
+      return await causeService.reviewDocument(params.docId, body.status, user.id, body.rejectionReason);
     },
     {
       auth: true,
@@ -324,11 +230,11 @@ export const causeController = new Elysia({ prefix: "/causes" })
   .get(
     "/admin/pending",
     async ({ user }) => {
-        return await causeService.getPendingCauses(user.id);
+      return await causeService.getPendingCauses(user.id);
     },
     {
       auth: true,
-      detail: { tags: ["Causes", "Admin"], summary: "Listar causas aguardando aprovação" },
+      detail: { tags: ["Causes", "Admin"], summary: "Listar causas aguardando aprovacao" },
     }
   )
 
@@ -341,6 +247,6 @@ export const causeController = new Elysia({ prefix: "/causes" })
       auth: true,
       params: CauseParamsSchema,
       body: ModerateCauseSchema,
-      detail: { tags: ["Causes", "Admin"], summary: "Moderar causa (Mudar status e verificação)" },
+      detail: { tags: ["Causes", "Admin"], summary: "Moderar causa (Mudar status e verificacao)" },
     }
   );

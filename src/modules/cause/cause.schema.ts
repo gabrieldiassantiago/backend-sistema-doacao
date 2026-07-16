@@ -27,6 +27,11 @@ export const UpdateCauseSchema = t.Object({
     images: t.Optional(t.Files()),
     imageKeys: t.Optional(t.Array(t.String())),
     isFeatured: t.Optional(t.BooleanString()),
+    status: t.Optional(t.Union([
+        t.Literal("ACTIVE"),
+        t.Literal("INACTIVE"),
+        t.Literal("PENDING"),
+    ])),
 
     // Localização
     locationName: t.Optional(t.String()),
@@ -54,7 +59,7 @@ export const UpdateCauseSchema = t.Object({
  */
 export const GetCausesQuerySchema = t.Object({
     skip: t.Optional(t.Numeric({ description: "Número de causas a pular (paginação)." })),
-    take: t.Optional(t.Numeric({ description: "Número máximo de causas a retornar." })),
+    take: t.Optional(t.Numeric({ maximum: 12, description: "Número máximo de causas a retornar (máximo 12)." })),
     sort: t.Optional(
         t.Union(
             [
