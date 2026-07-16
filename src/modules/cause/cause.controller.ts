@@ -220,7 +220,7 @@ export const causeController = new Elysia({ prefix: "/causes" })
       return await causeService.reviewDocument(params.docId, body.status, user.id, body.rejectionReason);
     },
     {
-      auth: true,
+      isAdmin: true,
       params: t.Object({ docId: t.String() }),
       body: ReviewDocumentSchema,
       detail: { tags: ["Causes", "Admin"], summary: "Aprovar ou rejeitar documento" },
@@ -230,10 +230,10 @@ export const causeController = new Elysia({ prefix: "/causes" })
   .get(
     "/admin/pending",
     async ({ user }) => {
-      return await causeService.getPendingCauses(user.id);
+      return await causeService.getPendingCauses();
     },
     {
-      auth: true,
+      isAdmin: true,
       detail: { tags: ["Causes", "Admin"], summary: "Listar causas aguardando aprovacao" },
     }
   )
@@ -244,7 +244,7 @@ export const causeController = new Elysia({ prefix: "/causes" })
       return await causeService.moderateCause(params.id, body.status, body.isVerified, user.id);
     },
     {
-      auth: true,
+      isAdmin: true,
       params: CauseParamsSchema,
       body: ModerateCauseSchema,
       detail: { tags: ["Causes", "Admin"], summary: "Moderar causa (Mudar status e verificacao)" },
