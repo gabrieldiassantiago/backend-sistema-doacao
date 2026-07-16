@@ -148,13 +148,12 @@ export const suggestionController = new Elysia({ prefix: '/collection-points/sug
     '/admin/pending',
     async ({ user, query }) => {
       return suggestionService.getPending(
-        user.id,
         query.skip ? Number(query.skip) : undefined,
         query.take ? Number(query.take) : undefined,
       );
     },
     {
-      auth: true,
+      isAdmin: true,
       query: PendingSuggestionsQuerySchema,
       detail: {
         tags: ['Collection Points', 'Suggestions', 'Admin'],
@@ -173,13 +172,13 @@ export const suggestionController = new Elysia({ prefix: '/collection-points/sug
   .patch(
     '/admin/:id/review',
     async ({ params, body, user }) => {
-      return suggestionService.review(params.id, user.id, {
+      return suggestionService.review(params.id, {
         status: body.status,
         adminNote: body.adminNote,
       });
     },
     {
-      auth: true,
+      isAdmin: true,
       params: SuggestionParamsSchema,
       body: ReviewSuggestionSchema,
       detail: {
