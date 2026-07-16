@@ -12,6 +12,7 @@ interface DonationConfirmationEmailProps {
   newBadges: BadgeInfo[];
   levelName: string;
   imageUrl?: string; 
+  logoUrl?: string;
 }
 
 export default function DonationHumanEmail({
@@ -22,6 +23,7 @@ export default function DonationHumanEmail({
   newBadges,
   levelName,
   imageUrl = "https://i.pinimg.com/1200x/95/29/6f/95296fca987900919d103200d64e5f0e.jpg", 
+  logoUrl = "https://doacao-frontend-swart.vercel.app/logo.svg",
 }: DonationConfirmationEmailProps) {
   
   const formattedAmount = new Intl.NumberFormat("pt-BR", {
@@ -40,6 +42,16 @@ export default function DonationHumanEmail({
           <tbody>
             <tr>
               <td style={{ padding: "40px 20px" }}>
+                <div style={{ marginBottom: "20px" }}>
+                  <img
+                    src={logoUrl}
+                    alt="doare"
+                    style={{
+                      height: "32px",
+                      display: "block",
+                    }}
+                  />
+                </div>
                 
                 <img 
                   src={imageUrl} 

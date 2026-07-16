@@ -18,6 +18,7 @@ import type {
   PaymentInput,
 } from "./donation.types";
 import type { EmailQueueService } from "../../jobs/email-queue";
+import { BadgeKey } from "../../../generated/prisma/enums";
 
 export class DonationService implements IDonationService {
   constructor(
@@ -38,6 +39,7 @@ export class DonationService implements IDonationService {
     if (cause.status !== "ACTIVE") {
       throw new BadRequestError("Causa não está aceitando doações", ErrorCodes.CAUSE_NOT_ACTIVE);
     }
+    
 
     // busca stats atuais do usuário para calcular XP e badges
     const stats = await this.donationRepository.getUserStats(data.userId);
@@ -45,9 +47,13 @@ export class DonationService implements IDonationService {
     const donationCountAfter = stats.donationCount + 1;
     const totalDonatedAfter  = stats.totalDonated + data.amount;
 
-    // calcula o XP ganho e os badges desbloqueados com essa doação
-    const xpEarned    = computeXpForDonation(data.amount, donationCountAfter);
-    const newBadgeKeys = computeNewBadges(donationCountAfter, totalDonatedAfter, stats.earnedBadgeKeys);
+    let xpEarned = 0;
+    let newBadgeKeys: BadgeKey[] = [];
+    
+    if (!data.isAnonymous) {
+      xpEarned = computeXpForDonation(data.amount, donationCountAfter);
+      newBadgeKeys = computeNewBadges(donationCountAfter, totalDonatedAfter, stats.earnedBadgeKeys);
+    }
 
     // persiste a doação, atualização da causa, XP do usuário e badges desbloqueados em uma transação
     const donation = await this.donationRepository.createWithGamification(
@@ -89,8 +95,13 @@ export class DonationService implements IDonationService {
     const donationCountAfter = stats.donationCount + 1;
     const totalDonatedAfter  = stats.totalDonated + payment.amount;
 
-    const xpEarned     = computeXpForDonation(payment.amount, donationCountAfter);
-    const newBadgeKeys = computeNewBadges(donationCountAfter, totalDonatedAfter, stats.earnedBadgeKeys);
+    let xpEarned = 0;
+    let newBadgeKeys: BadgeKey[] = [];
+    
+    if (!payment.isAnonymous) {
+      xpEarned = computeXpForDonation(payment.amount, donationCountAfter);
+      newBadgeKeys = computeNewBadges(donationCountAfter, totalDonatedAfter, stats.earnedBadgeKeys);
+    }
 
     const donation = await this.donationRepository.createWithGamificationAndPayment(
       {
@@ -98,6 +109,7 @@ export class DonationService implements IDonationService {
         message: payment.message ?? undefined,
         userId:  payment.userId,
         causeId: payment.causeId,
+        isAnonymous: payment.isAnonymous,
       },
       xpEarned,
       newBadgeKeys,

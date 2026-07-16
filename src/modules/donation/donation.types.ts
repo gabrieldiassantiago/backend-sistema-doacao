@@ -8,6 +8,7 @@ export type DonationWithRelations = {
   xpEarned: number;
   userId: string;
   causeId: string;
+  isAnonymous: boolean;
   createdAt: Date;
   cause: { id: string; title: string; images: CauseImage[] };
   user: { id: string; name: string; image: string | null };
@@ -34,6 +35,7 @@ export type CreateDonationData = {
   message?: string;
   userId: string;
   causeId: string;
+  isAnonymous?: boolean;
 };
 
 export type PaymentInput = {
@@ -42,6 +44,7 @@ export type PaymentInput = {
   message: string | null;
   userId: string;
   causeId: string;
+  isAnonymous?: boolean;
 };
 
 export type DonationResult = {

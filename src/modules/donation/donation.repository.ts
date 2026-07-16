@@ -102,13 +102,24 @@ export class DonationRepository implements IDonationRepository {
   }
 
   async findById(id: string): Promise<DonationWithRelations | null> {
-    return this.prisma.donation.findUnique({
+    const donation = await this.prisma.donation.findUnique({
       where: { id },
       include: {
         cause: { select: { id: true, title: true, images: true } },
         user: { select: { id: true, name: true, image: true } },
       }
     });
+
+    if (!donation) return null;
+
+    if (donation.isAnonymous) {
+      return {
+        ...donation,
+        user: { id: donation.user.id, name: "Anônimo", image: null }
+      };
+    }
+
+    return donation;
   }
 
   async findByUser(userId: string, skip = 0, take = 20): Promise<DonationWithRelations[]> {
@@ -125,7 +136,7 @@ export class DonationRepository implements IDonationRepository {
   }
 
   async findByCause(causeId: string, skip = 0, take = 20): Promise<DonationWithRelations[]> {
-    return this.prisma.donation.findMany({
+    const donations = await this.prisma.donation.findMany({
       where: { causeId },
       skip,
       take,
@@ -134,6 +145,16 @@ export class DonationRepository implements IDonationRepository {
         cause: { select: { id: true, title: true, images: true } },
         user: { select: { id: true, name: true, image: true } },
       }
+    });
+
+    return donations.map(d => {
+      if (d.isAnonymous) {
+        return {
+          ...d,
+          user: { id: d.user.id, name: "Anônimo", image: null }
+        };
+      }
+      return d;
     });
   }
 
@@ -166,8 +187,8 @@ export class DonationRepository implements IDonationRepository {
         name: true,
         image: true,
         xpPoints: true,
-        _count: { select: { donations: true } },
-        donations: { select: { amount: true } },
+        _count: { select: { donations: { where: { isAnonymous: false } } } },
+        donations: { where: { isAnonymous: false }, select: { amount: true } },
       },
     });
 
