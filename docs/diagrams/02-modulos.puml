@@ -1,0 +1,78 @@
+@startuml Módulos do Sistema
+' ═══════════════════════════════════════════════════════════════
+'  Diagrama de Módulos e Dependências
+'  Layout: Left → Right, agrupado por domínio
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 10
+skinparam ArrowThickness 1.5
+skinparam ArrowColor #888888
+skinparam packageBorderThickness 2
+
+skinparam rectangle {
+  BackgroundColor white
+  FontStyle bold
+}
+
+left to right direction
+
+' ════════════════════════════════════════
+'  DOMÍNIOS
+' ════════════════════════════════════════
+
+package "Autenticação" as auth_pkg #E8F5E9;line:#4CAF50 {
+  rectangle "🔐 Auth\n(Better Auth)" as AUTH #white;line:#66BB6A
+  rectangle "👤 User" as USER #white;line:#66BB6A
+}
+
+package "Catálogo" as catalog_pkg #E3F2FD;line:#1976D2 {
+  rectangle "🏷 Category" as CATEGORY #white;line:#64B5F6
+  rectangle "📋 Cause" as CAUSE #white;line:#64B5F6
+}
+
+package "Financeiro" as finance_pkg #FFF3E0;line:#F57C00 {
+  rectangle "💰 Donation" as DONATION #white;line:#FFB74D
+  rectangle "💳 Payment" as PAYMENT #white;line:#FFB74D
+  rectangle "🏦 Withdrawal" as WITHDRAWAL #white;line:#FFB74D
+  rectangle "🎮 Gamification" as GAMIF #FFF3E0;line:#F57C00
+}
+
+package "Comunidade" as community_pkg #F3E5F5;line:#7B1FA2 {
+  rectangle "📍 Collection\n    Point" as CP #white;line:#CE93D8
+  rectangle "💡 Suggestion" as SUGGEST #white;line:#CE93D8
+}
+
+package "Infraestrutura" as infra_pkg #ECEFF1;line:#546E7A {
+  rectangle "📨 Email Queue" as EMAIL #white;line:#90A4AE
+  rectangle "☁️ S3 Storage" as S3 #white;line:#90A4AE
+  rectangle "💳 Mercado Pago" as MP #white;line:#90A4AE
+}
+
+' ════════════════════════════════════════
+'  RELAÇÕES
+' ════════════════════════════════════════
+
+AUTH --> USER
+
+CAUSE --> CATEGORY : pertence a
+DONATION --> CAUSE : doação para
+PAYMENT --> DONATION : gera doação
+DONATION --> GAMIF : calcula XP
+WITHDRAWAL --> CAUSE : saca saldo
+
+SUGGEST --> CP : cria ponto
+
+CAUSE --> S3
+CAUSE --> EMAIL
+DONATION --> EMAIL
+PAYMENT --> MP
+PAYMENT --> EMAIL
+WITHDRAWAL --> MP
+SUGGEST --> S3
+SUGGEST --> EMAIL
+
+@enduml
