@@ -26,7 +26,9 @@ model User {
   withdrawals   Withdrawal[]
   passwordHash  String?
   isAdmin       Boolean
+  isAnonymous   Boolean      @default(false)
   accounts      Account[]
+  collectionPointSuggestions CollectionPointSuggestion[]
 
   @@map("user")
 }
@@ -141,6 +143,8 @@ model Payment {
   cause        Cause         @relation(fields: [causeId], references: [id])
   donationId   String?       @unique
   donation     Donation?     @relation(fields: [donationId], references: [id])
+  emailSent    Boolean       @default(false)
+  isAnonymous  Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -163,12 +167,13 @@ model Donation {
   amount    Float
   message   String?
   xpEarned  Int      @default(0)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  causeId   String
-  cause     Cause    @relation(fields: [causeId], references: [id])
-  payment   Payment?
-  createdAt DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  causeId     String
+  cause       Cause    @relation(fields: [causeId], references: [id])
+  isAnonymous Boolean  @default(false)
+  payment     Payment?
+  createdAt   DateTime @default(now())
 }
 
 model UserBadge {
@@ -294,4 +299,70 @@ model CauseDocument {
 
   @@index([causeId])
   @@map("cause_document")
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CollectionPointSuggestion {
+  id              String           @id @default(uuid())
+
+  // Quem sugeriu
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+
+  // Dados do ponto sugerido
+  name            String
+  street          String
+  number          String
+  complement      String?
+  neighborhood    String?
+  city            String
+  state           String
+  zipCode         String?
+  country         String           @default("Brasil")
+
+  // Geolocalização
+  latitude        Float
+  longitude       Float
+
+  // Itens aceitos sugeridos (texto livre)
+  suggestedItems  String[]
+
+  // Justificativa do usuário
+  reason          String?
+
+  // Moderação
+  status          SuggestionStatus @default(PENDING)
+  adminNote       String?
+  reviewedAt      DateTime?
+
+  // Referência ao ponto de coleta criado (se aprovado)
+  approvedPointId String?          @unique
+
+  // Imagens (ex: fachada)
+  images          SuggestionImage[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("collection_point_suggestion")
+}
+
+model SuggestionImage {
+  id           String                    @id @default(uuid())
+  suggestionId String
+  suggestion   CollectionPointSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  key          String
+  position     Int
+  createdAt    DateTime                  @default(now())
+
+  @@index([suggestionId])
+  @@unique([suggestionId, position])
+  @@map("suggestion_image")
 }
