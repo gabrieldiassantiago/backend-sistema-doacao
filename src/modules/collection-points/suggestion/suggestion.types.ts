@@ -100,14 +100,12 @@ export interface ISuggestionService {
   ): Promise<SuggestionWithImageUrls[]>;
 
   getPending(
-    adminId: string,
     skip?: number,
     take?: number,
   ): Promise<{ suggestions: SuggestionWithImageUrls[]; total: number }>;
 
   review(
     id: string,
-    adminId: string,
     data: ReviewSuggestionData,
   ): Promise<SuggestionWithImageUrls>;
 }

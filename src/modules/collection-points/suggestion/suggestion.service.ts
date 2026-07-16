@@ -34,12 +34,7 @@ export class SuggestionService implements ISuggestionService {
     };
   }
 
-  private async ensureAdmin(userId: string) {
-    const user = await this.userRepository.findById(userId);
-    if (!user?.isAdmin) {
-      throw new ForbiddenError('Acesso restrito para administradores', ErrorCodes.FORBIDDEN);
-    }
-  }
+
 
   private async getSuggestionOrThrow(id: string) {
     const suggestion = await this.suggestionRepository.findById(id);
@@ -76,11 +71,9 @@ export class SuggestionService implements ISuggestionService {
   }
 
   async getPending(
-    adminId: string,
     skip = 0,
     take = 20,
   ): Promise<{ suggestions: SuggestionWithImageUrls[]; total: number }> {
-    await this.ensureAdmin(adminId);
 
     const [suggestions, total] = await Promise.all([
       this.suggestionRepository.findByStatus('PENDING', skip, take),
@@ -95,11 +88,8 @@ export class SuggestionService implements ISuggestionService {
 
   async review(
     id: string,
-    adminId: string,
     data: ReviewSuggestionData,
   ): Promise<SuggestionWithImageUrls> {
-    await this.ensureAdmin(adminId);
-
     const suggestion = await this.getSuggestionOrThrow(id);
 
     if (suggestion.status !== 'PENDING') {
