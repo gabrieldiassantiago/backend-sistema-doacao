@@ -49,12 +49,7 @@ export class CauseService implements ICauseService {
         return { ...doc, url: this.storage.presignRead(doc.fileKey) };
     }
 
-    private async ensureAdmin(userId: string) {
-        const user = await this.userRepository.findById(userId);
-        if (!user?.isAdmin) {
-            throw new ForbiddenError("Acesso restrito para administradores", ErrorCodes.FORBIDDEN);
-        }
-    }
+
 
     private async getCauseOrThrow(causeId: string) {
         const cause = await this.causeRepository.findById(causeId);
@@ -121,8 +116,7 @@ export class CauseService implements ICauseService {
         return causes.map((c) => this.withImageUrls(c));
     }
 
-    async getPendingCauses(adminId: string) {
-        await this.ensureAdmin(adminId);
+    async getPendingCauses() {
         const causes = await this.causeRepository.findPendingCauses();
         return causes.map((c) => this.withImageUrls(c));
     }
@@ -255,8 +249,6 @@ export class CauseService implements ICauseService {
         adminId: string,
         rejectionReason?: string,
     ) {
-        await this.ensureAdmin(adminId);
-
         const doc = await this.causeRepository.updateDocumentStatus(docId, status, rejectionReason);
         return this.withDocumentUrls(doc);
     }
@@ -267,8 +259,6 @@ export class CauseService implements ICauseService {
         isVerified: boolean,
         adminId: string,
     ) {
-        await this.ensureAdmin(adminId);
-
         const cause = await this.causeRepository.updateCauseVerification(causeId, status, isVerified);
 
         if (status === "ACTIVE" || status === "APPROVED") {
