@@ -4,9 +4,10 @@ export default defineConfig({
     schema: 'prisma/schema.prisma',
     migrations: {
         path: 'prisma/migrations',
-        seed: 'prisma/seed-categories.ts',
+        seed: 'prisma/seed-user.ts',
     },
     datasource: {
-        url: process.env.DATABASE_URL || 'postgresql://postgres:123456@localhost:5432/postgres'
+        url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/doacao'
     },
+    
 });
