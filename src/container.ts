@@ -79,7 +79,7 @@ export function createContainer(overrides: ContainerOverrides = {}): AppContaine
   
   const withdrawalService =
     overrides.withdrawalService ??
-    new WithdrawalService(withdrawalRepository, causeRepository, prisma);
+    new WithdrawalService(withdrawalRepository, causeRepository);
 
   const collectionPointService =
     overrides.collectionPointService ?? new CollectionPointService(collectionPointRepository);

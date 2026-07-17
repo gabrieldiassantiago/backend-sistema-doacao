@@ -67,7 +67,7 @@ export interface IDonationRepository {
     xpEarned: number,
     newBadgeKeys: BadgeKey[],
     paymentId: string,
-  ): Promise<DonationWithRelations>;
+  ): Promise<DonationWithRelations | null>;
 
   findById(id: string): Promise<DonationWithRelations | null>;
   findByUser(userId: string, skip: number, take: number): Promise<DonationWithRelations[]>;
@@ -78,7 +78,7 @@ export interface IDonationRepository {
 
 export interface IDonationService {
   create(data: CreateDonationData): Promise<DonationResult>;
-  createFromPayment(payment: PaymentInput): Promise<DonationResult>;
+  createFromPayment(payment: PaymentInput): Promise<DonationResult | null>;
   findById(id: string): Promise<DonationWithRelations | null>;
   findByUser(userId: string, skip: number, take: number): Promise<DonationWithRelations[]>;
   findByCause(causeId: string, skip: number, take: number): Promise<DonationWithRelations[]>;

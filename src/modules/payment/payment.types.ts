@@ -57,7 +57,7 @@ export interface IPaymentService {
     payerEmail: string,
   ): Promise<InitiatePaymentResult>;
   handleWebhook(body: WebhookPayload): Promise<WebhookResult>;
-  findById(id: string): Promise<any | null>;
+  findById(id: string, userId: string): Promise<any | null>;
   findByUser(userId: string, skip?: number, take?: number): Promise<any[]>;
-  findByCause(causeId: string, skip?: number, take?: number): Promise<any[]>;
+  findByCause(causeId: string, userId: string, skip?: number, take?: number): Promise<any[]>;
 }

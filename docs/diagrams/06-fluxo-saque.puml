@@ -1,0 +1,59 @@
+@startuml Fluxo de Saque
+' ═══════════════════════════════════════════════════════════════
+'  Fluxo de Saque via PIX
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam SequenceMessageAlignment center
+
+skinparam participant {
+  BackgroundColor #FAFAFA
+  BorderColor #BDBDBD
+  FontStyle bold
+}
+
+skinparam sequence {
+  ArrowThickness 1.5
+  ArrowColor #555555
+  LifeLineBorderColor #CCCCCC
+  LifeLineBackgroundColor #F5F5F5
+  GroupBorderColor #F57C00
+  GroupBackgroundColor #FFF3E0
+  DividerBorderColor #CCCCCC
+}
+
+title **Fluxo de Saque via PIX**
+
+actor "👤 Dono da\nCausa" as U
+participant "⚡ API" as API #E3F2FD
+database "🐘 PostgreSQL" as DB #E8EAF6
+
+== Solicitação de saque ==
+
+U -> API : POST /withdrawals\n{ causeId, amount, pixKey }
+activate API
+
+API -> DB : Busca Cause
+activate DB
+DB --> API : cause
+deactivate DB
+
+note right of API
+  Validações:
+  ✓ Usuário é o dono da causa?
+  ✓ Saldo >= valor solicitado?
+end note
+
+group Operação atômica
+  API -> DB : Decrementa cause.balance\n(reserva saldo)
+  API -> DB : Cria Withdrawal\n(status: PENDING)
+end
+
+API --> U : { id, status: PENDING,\n  amount, pixKey }
+deactivate API
+
+@enduml

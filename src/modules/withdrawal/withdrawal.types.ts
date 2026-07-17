@@ -18,6 +18,7 @@ export type WithdrawalResult = {
 
 export interface IWithdrawalRepository {
   create(data: CreateWithdrawalData): Promise<any>;
+  reserveBalanceAndCreate(data: CreateWithdrawalData): Promise<any | null>;
   findById(id: string): Promise<any | null>;
   findByCause(causeId: string, skip: number, take: number): Promise<any[]>;
   findByUser(userId: string, skip: number, take: number): Promise<any[]>;
@@ -33,7 +34,7 @@ export interface IWithdrawalService {
     data: { causeId: string; amount: number; pixKey: string },
     userId: string,
   ): Promise<WithdrawalResult>;
-  findById(id: string): Promise<any | null>;
+  findById(id: string, userId: string): Promise<any | null>;
   findByCause(causeId: string, userId: string, skip?: number, take?: number): Promise<any[]>;
   findByUser(userId: string, skip?: number, take?: number): Promise<any[]>;
 }

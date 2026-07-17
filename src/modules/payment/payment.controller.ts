@@ -38,8 +38,8 @@ export const paymentController = new Elysia({ prefix: "/payments" })
         return { received: true, ...result };
       } catch (e) {
         console.error("[webhook] Erro inesperado:", e);
-        set.status = 200; // sempre retornar 200 pro MP não retentar desnecessariamente
-        return { received: true };
+        set.status = 500;
+        return { received: false };
       }
     },
     {
@@ -57,14 +57,15 @@ export const paymentController = new Elysia({ prefix: "/payments" })
   // Busca um pagamento específico pelo ID
   .get(
     "/:id",
-    async ({ params, set }) => {
-      const payment = await paymentService.findById(params.id);
+    async ({ params, user }) => {
+      const payment = await paymentService.findById(params.id, user.id);
       if (!payment) {
         throw new NotFoundError("Pagamento não encontrado", ErrorCodes.PAYMENT_NOT_FOUND);
       }
       return payment;
     },
     {
+      auth: true,
       params: t.Object({ id: t.String() }),
       detail: { tags: ["Payments"], summary: "Buscar pagamento por ID" },
     },
@@ -88,9 +89,15 @@ export const paymentController = new Elysia({ prefix: "/payments" })
   // Pagamentos de uma causa (para o dono acompanhar entradas)
   .get(
     "/cause/:causeId",
-    ({ params, query }) =>
-      paymentService.findByCause(params.causeId, Number(query.skip) || 0, Number(query.take) || 20),
+    ({ params, user, query }) =>
+      paymentService.findByCause(
+        params.causeId,
+        user.id,
+        Number(query.skip) || 0,
+        Number(query.take) || 20,
+      ),
     {
+      auth: true,
       params: t.Object({ causeId: t.String() }),
       query: t.Object({
         skip: t.Optional(t.Numeric()),

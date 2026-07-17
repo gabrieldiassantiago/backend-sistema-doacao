@@ -66,14 +66,15 @@ export const withdrawalController = new Elysia({ prefix: "/withdrawals" })
   // Busca um saque por ID
   .get(
     "/:id",
-    async ({ params }) => {
-      const w = await withdrawalService.findById(params.id);
+    async ({ params, user }) => {
+      const w = await withdrawalService.findById(params.id, user.id);
       if (!w) {
         throw new NotFoundError("Saque não encontrado", ErrorCodes.WITHDRAWAL_NOT_FOUND);
       }
       return w;
     },
     {
+      auth: true,
       params: WithdrawalParamsSchema,
       detail: { tags: ["Withdrawals"], summary: "Buscar saque por ID" },
     },

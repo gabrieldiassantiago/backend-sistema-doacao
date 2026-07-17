@@ -1,0 +1,95 @@
+@startuml Fluxo de Doação via PIX
+' ═══════════════════════════════════════════════════════════════
+'  Fluxo de Doação via PIX (Mercado Pago)
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam SequenceMessageAlignment center
+
+skinparam participant {
+  BackgroundColor #FAFAFA
+  BorderColor #BDBDBD
+  FontStyle bold
+}
+
+skinparam sequence {
+  ArrowThickness 1.5
+  ArrowColor #555555
+  LifeLineBorderColor #CCCCCC
+  LifeLineBackgroundColor #F5F5F5
+  GroupBorderColor #1976D2
+  GroupBackgroundColor #E3F2FD
+  DividerBorderColor #CCCCCC
+}
+
+title **Fluxo de Doação via PIX**
+
+actor "👤 Usuário" as U
+participant "⚡ API" as API #E3F2FD
+participant "💳 Mercado\nPago" as MP #FFF3E0
+database "🐘 PostgreSQL" as DB #E8EAF6
+queue "📨 Email\nQueue" as Q #FFEBEE
+participant "📧 Mailer" as M #F3E5F5
+
+== 1. Iniciando pagamento ==
+
+U -> API : POST /payments/initiate\n{ causeId, amount }
+activate API
+
+API -> DB : Cria Payment\n(status: PENDING)
+activate DB
+DB --> API : payment.id
+deactivate DB
+
+API -> MP : Cria pagamento PIX
+activate MP
+MP --> API : { qrCode, mpPaymentId }
+deactivate MP
+
+API -> DB : Atualiza Payment\n(mpPaymentId, qrCode)
+
+API --> U : { qrCode, qrCodeBase64,\n  paymentId, status }
+deactivate API
+
+== 2. Usuário paga ==
+
+U -> MP : Escaneia QR Code\ne confirma PIX
+note right of U : O pagamento é\nprocessado pelo\nMercado Pago
+
+== 3. Webhook de confirmação ==
+
+MP -> API : POST /payments/webhook\n{ type: "payment", data.id }
+activate API
+
+API -> MP : GET /v1/payments/:id\n(confirma status)
+activate MP
+MP --> API : status: "approved" ✅
+deactivate MP
+
+group Transação atômica
+  API -> DB : Cria Donation
+  API -> DB : Incrementa raised + balance (Cause)
+  API -> DB : Incrementa xpPoints (User)
+  API -> DB : Cria UserBadge[] (se novos)
+  API -> DB : Payment → APPROVED
+end
+
+API -> Q : Enfileira email de confirmação
+activate Q
+
+API --> MP : 200 OK
+deactivate API
+
+== 4. Email assíncrono ==
+
+Q -> M : Processa job (3 retries)
+activate M
+M --> U : 📧 Confirmação de doação\n(XP ganho + badges)
+deactivate M
+deactivate Q
+
+@enduml

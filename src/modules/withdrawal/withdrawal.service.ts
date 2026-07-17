@@ -1,4 +1,3 @@
-import { PrismaClient } from "../../../generated/prisma/client";
 import type { ICauseRepository } from "../cause/cause.types";
 import type { IWithdrawalRepository, IWithdrawalService, WithdrawalResult } from "./withdrawal.types";
 import type { CreateWithdrawalDTO } from "./withdrawal.schema";
@@ -9,7 +8,6 @@ export class WithdrawalService implements IWithdrawalService {
   constructor(
     private readonly withdrawalRepository: IWithdrawalRepository,
     private readonly causeRepository:      ICauseRepository,
-    private readonly prisma:               PrismaClient,
   ) {}
 
   async create(data: CreateWithdrawalDTO, userId: string): Promise<WithdrawalResult> {
@@ -22,24 +20,18 @@ export class WithdrawalService implements IWithdrawalService {
       throw new ForbiddenError("Você não é o dono desta causa", ErrorCodes.FORBIDDEN);
     }
 
-    if (cause.balance < data.amount) {
-      throw new BadRequestError("Saldo insuficiente na causa", ErrorCodes.INSUFFICIENT_BALANCE);
-    }
-
-    // Reserva o saldo atomicamente antes de chamar o MP
-    await this.prisma.cause.update({
-      where: { id: cause.id },
-      data:  { balance: { decrement: data.amount } },
-    });
-    
-
-    // Cria o registro de saque como PENDING
-    const withdrawal = await this.withdrawalRepository.create({
+    // A reserva e o registro do saque são uma única operação atômica. O filtro
+    // condicional impede que duas requisições consumam o mesmo saldo.
+    const withdrawal = await this.withdrawalRepository.reserveBalanceAndCreate({
       causeId: data.causeId,
       userId,
       amount:  data.amount,
       pixKey:  data.pixKey,
     });
+
+    if (!withdrawal) {
+      throw new BadRequestError("Saldo insuficiente na causa", ErrorCodes.INSUFFICIENT_BALANCE);
+    }
     
     return {
       id:        withdrawal.id,
@@ -50,8 +42,12 @@ export class WithdrawalService implements IWithdrawalService {
     };
   }
 
-  async findById(id: string) {
-    return this.withdrawalRepository.findById(id);
+  async findById(id: string, userId: string) {
+    const withdrawal = await this.withdrawalRepository.findById(id);
+    if (withdrawal && withdrawal.userId !== userId) {
+      throw new ForbiddenError("Acesso negado", ErrorCodes.FORBIDDEN);
+    }
+    return withdrawal;
   }
 
   async findByCause(causeId: string, userId: string, skip = 0, take = 20) {

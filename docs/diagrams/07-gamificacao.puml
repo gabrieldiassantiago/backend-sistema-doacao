@@ -1,0 +1,52 @@
+@startuml Gamificação
+' ═══════════════════════════════════════════════════════════════
+'  Sistema de Gamificação — Níveis e Badges
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 10
+skinparam ArrowThickness 2
+
+skinparam state {
+  BackgroundColor #FAFAFA
+  BorderColor #CCCCCC
+  FontStyle bold
+}
+
+title **Sistema de Gamificação — Progressão de Níveis**
+
+state "🌱 Nível 1\n**Semente**\n0 XP" as L1 #E8F5E9;line:#4CAF50
+state "🌿 Nível 2\n**Broto**\n100 XP" as L2 #E8F5E9;line:#4CAF50
+state "🌳 Nível 3\n**Planta**\n300 XP" as L3 #C8E6C9;line:#388E3C
+state "🌲 Nível 4\n**Árvore**\n700 XP" as L4 #A5D6A7;line:#2E7D32
+state "🌳🌳 Nível 5\n**Floresta**\n1.500 XP" as L5 #81C784;line:#1B5E20
+state "🛡 Nível 6\n**Guardião**\n3.000 XP" as L6 #FFF3E0;line:#F57C00
+state "🦸 Nível 7\n**Herói**\n5.000 XP" as L7 #FFF9C4;line:#F9A825
+
+[*] --> L1
+L1 --> L2 : +100 XP
+L2 --> L3 : +200 XP
+L3 --> L4 : +400 XP
+L4 --> L5 : +800 XP
+L5 --> L6 : +1.500 XP
+L6 --> L7 : +2.000 XP
+L7 --> [*] : XP máximo
+
+note right of L1
+  **Fórmula de XP por doação:**
+  XP = max(1, floor(valor_em_R$))
+
+  **Bônus por marcos:**
+  1ª doação  → +50 XP
+  5ª doação  → +20 XP
+  10ª doação → +30 XP
+  20ª doação → +50 XP
+
+  ⚠️ Doações anônimas
+  NÃO concedem XP
+end note
+
+@enduml

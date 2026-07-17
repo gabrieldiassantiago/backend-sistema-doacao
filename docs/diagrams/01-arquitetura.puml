@@ -1,0 +1,162 @@
+@startuml Arquitetura Geral
+' ═══════════════════════════════════════════════════════════════
+'  Diagrama de Arquitetura — API de Doações Gamificadas
+'  Layout: Top → Bottom, limpo e organizado
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 10
+skinparam ArrowThickness 1.5
+skinparam ArrowColor #666666
+skinparam packageBorderThickness 2
+skinparam noteBorderColor transparent
+skinparam noteBackgroundColor transparent
+
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #CCCCCC
+  FontStyle bold
+}
+
+skinparam package {
+  BackgroundColor #F8F9FA
+  BorderColor #DEE2E6
+  FontColor #333333
+  FontStyle bold
+}
+
+top to bottom direction
+
+' ════════════════════════════════════════
+'  CAMADA 1 — CLIENTES
+' ════════════════════════════════════════
+
+together {
+  rectangle "🌐  **Frontend Web**\n//Vercel (React)//" as WEB #E8F5E9;line:#4CAF50
+  rectangle "💳  **Mercado Pago**\n//Webhook Callback//" as MP_HOOK #FFF3E0;line:#FF9800
+}
+
+' ════════════════════════════════════════
+'  CAMADA 2 — API GATEWAY
+' ════════════════════════════════════════
+
+package "API Gateway  ─  Elysia :3000" as API_GW #E3F2FD;line:#1976D2 {
+  rectangle "CORS" as CORS #white;line:#90CAF9
+  rectangle "Auth\nMiddleware" as AUTH #white;line:#90CAF9
+  rectangle "Error\nHandler" as ERR #white;line:#90CAF9
+  rectangle "Logger\n(Pino)" as LOG #white;line:#90CAF9
+  rectangle "OpenAPI\n/docs" as DOCS #white;line:#90CAF9
+
+  CORS -right-> AUTH
+  AUTH -right-> ERR
+  ERR -right-> LOG
+}
+
+' ════════════════════════════════════════
+'  CAMADA 3 — CONTROLLERS
+' ════════════════════════════════════════
+
+package "Controllers" as CTRL_PKG #FFF3E0;line:#F57C00 {
+  rectangle "Cause" as C1 #white;line:#FFB74D
+  rectangle "Donation" as C2 #white;line:#FFB74D
+  rectangle "Payment" as C3 #white;line:#FFB74D
+  rectangle "Withdrawal" as C4 #white;line:#FFB74D
+  rectangle "User" as C5 #white;line:#FFB74D
+  rectangle "Category" as C6 #white;line:#FFB74D
+  rectangle "Collection\nPoint" as C7 #white;line:#FFB74D
+  rectangle "Suggestion" as C8 #white;line:#FFB74D
+}
+
+' ════════════════════════════════════════
+'  CAMADA 4 — SERVICES
+' ════════════════════════════════════════
+
+package "Services  ─  Lógica de Negócio" as SVC_PKG #F3E5F5;line:#7B1FA2 {
+  rectangle "CauseService" as S1 #white;line:#CE93D8
+  rectangle "DonationService" as S2 #white;line:#CE93D8
+  rectangle "PaymentService" as S3 #white;line:#CE93D8
+  rectangle "WithdrawalService" as S4 #white;line:#CE93D8
+  rectangle "UserService" as S5 #white;line:#CE93D8
+  rectangle "CategoryService" as S6 #white;line:#CE93D8
+  rectangle "CollectionPointService" as S7 #white;line:#CE93D8
+  rectangle "SuggestionService" as S8 #white;line:#CE93D8
+  rectangle "🎮 GamificationEngine" as GAMIF #EDE7F6;line:#7B1FA2
+}
+
+' ════════════════════════════════════════
+'  CAMADA 5 — INFRAESTRUTURA
+' ════════════════════════════════════════
+
+package "Infraestrutura" as INFRA_PKG #FFF9C4;line:#F9A825 {
+  rectangle "Repositories\n(Prisma ORM)" as REPO #white;line:#FDD835
+  rectangle "📨 Email Queue\n(BullMQ)" as EMAILQ #white;line:#FDD835
+  rectangle "☁️ S3 Storage\n(Bun S3)" as S3 #white;line:#FDD835
+  rectangle "💳 MercadoPago\nClient" as MPC #white;line:#FDD835
+  rectangle "📧 Mailer\n(Nodemailer)" as MAILER #white;line:#FDD835
+}
+
+' ════════════════════════════════════════
+'  CAMADA 6 — DATA STORES
+' ════════════════════════════════════════
+
+together {
+  database "🐘  **PostgreSQL 15**" as PG #E8EAF6;line:#3F51B5
+  database "🔴  **Redis 7**" as REDIS #FFEBEE;line:#F44336
+}
+
+' ════════════════════════════════════════
+'  CONEXÕES
+' ════════════════════════════════════════
+
+' Clientes → API
+WEB --> CORS
+MP_HOOK --> C3 : webhook
+
+' API → Controllers
+LOG --> CTRL_PKG
+
+' Controllers → Services (1:1)
+C1 --> S1
+C2 --> S2
+C3 --> S3
+C4 --> S4
+C5 --> S5
+C6 --> S6
+C7 --> S7
+C8 --> S8
+
+' Dependências entre Services
+S2 --> GAMIF : XP + badges
+S3 --> S2 : cria doação
+
+' Services → Infra
+S1 --> REPO
+S2 --> REPO
+S3 --> REPO
+S4 --> REPO
+S5 --> REPO
+S6 --> REPO
+S7 --> REPO
+S8 --> REPO
+
+S1 --> EMAILQ
+S2 --> EMAILQ
+S3 --> EMAILQ
+S8 --> EMAILQ
+
+S1 --> S3
+S8 --> S3
+
+S3 --> MPC
+S4 --> MPC
+
+EMAILQ --> MAILER
+
+' Infra → Data Stores
+REPO --> PG
+EMAILQ --> REDIS
+
+@enduml

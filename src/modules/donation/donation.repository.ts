@@ -59,8 +59,17 @@ export class DonationRepository implements IDonationRepository {
     xpEarned: number,
     newBadgeKeys: BadgeKey[],
     paymentId: string,
-  ): Promise<DonationWithRelations> {
+  ): Promise<DonationWithRelations | null> {
     return this.prisma.$transaction(async (tx) => {
+      // O pagamento é reivindicado dentro da mesma transação que cria a doação.
+      // Apenas um processamento concorrente consegue mudar PENDING para APPROVED.
+      const claimed = await tx.payment.updateMany({
+        where: { id: paymentId, status: "PENDING", donationId: null },
+        data: { status: "APPROVED" },
+      });
+
+      if (claimed.count !== 1) return null;
+
       const donation = await tx.donation.create({
         data: { ...data, xpEarned },
         include: {
@@ -94,7 +103,7 @@ export class DonationRepository implements IDonationRepository {
 
       await tx.payment.update({
         where: { id: paymentId },
-        data: { status: "APPROVED", donationId: donation.id },
+        data: { donationId: donation.id },
       });
 
       return donation;

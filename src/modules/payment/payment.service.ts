@@ -2,7 +2,7 @@ import type { ICauseRepository } from "../cause/cause.types";
 import type { IDonationService } from "../donation/donation.types";
 import type { IUserRepository } from "../user/user.types";
 import { mpPaymentClient } from "../../lib/mercadopago";
-import { NotFoundError, BadRequestError } from "../../errors/error-classes";
+import { NotFoundError, BadRequestError, ForbiddenError } from "../../errors/error-classes";
 import { ErrorCodes } from "../../errors/error-codes";
 import type {
   InitiatePaymentResult,
@@ -57,7 +57,7 @@ export class PaymentService implements IPaymentService {
         payer:              { email: payerEmail },
         description:        `Doação para: ${cause.title}`,
         external_reference: payment.id,
-        notification_url: 'https://doacao.thankfulmeadow-f50cdd2d.eastus2.azurecontainerapps.io/payments/webhook'
+        notification_url: process.env.MERCADO_PAGO_WEBHOOK_URL!
       },
       requestOptions: { idempotencyKey: payment.id },
     });
@@ -98,7 +98,7 @@ export class PaymentService implements IPaymentService {
       mpData = await mpPaymentClient.get({ id: mpPaymentId });
     } catch (err) {
       console.error(`[webhook] Erro ao buscar pagamento ${mpPaymentId} no MP:`, err);
-      return { processed: false, reason: "mp_fetch_error" };
+      throw err;
     }
 
     const mpStatus = mpData?.status;
@@ -147,22 +147,8 @@ export class PaymentService implements IPaymentService {
       isAnonymous: payment.isAnonymous,
     });
 
-    try {
-      const user = await this.userRepository.findById(payment.userId);
-      const cause = await this.causeRepository.findById(payment.causeId);
-      
-      if (user && cause && payment.payerEmail) {
-        await this.emailQueueService.enqueueDonationConfirmation(payment.payerEmail, {
-          userName: user.name,
-          causeTitle: cause.title,
-          amount: payment.amount,
-          xpEarned: result.xpEarned ?? 0,
-          newBadges: (result.newBadges ?? []).map((b: any) => ({ name: b.name, icon: b.icon })),
-          levelName: result.level?.name ?? "Nível 1",
-        });
-      }
-    } catch (emailErr) {
-      console.error(`[webhook] Erro ao enviar email de sucesso para o pagamento ${mpPaymentId}:`, emailErr);
+    if (!result) {
+      return { processed: false, reason: "already_processed" };
     }
 
     return {
@@ -177,11 +163,22 @@ export class PaymentService implements IPaymentService {
     return this.paymentRepository.findByUser(userId, skip, take);
   }
 
-  async findByCause(causeId: string, skip = 0, take = 20) {
+  async findByCause(causeId: string, userId: string, skip = 0, take = 20) {
+    const cause = await this.causeRepository.findById(causeId);
+    if (!cause) {
+      throw new NotFoundError("Causa não encontrada", ErrorCodes.CAUSE_NOT_FOUND);
+    }
+    if (cause.authorId !== userId) {
+      throw new ForbiddenError("Acesso negado", ErrorCodes.FORBIDDEN);
+    }
     return this.paymentRepository.findByCause(causeId, skip, take);
   }
 
-  async findById(id: string) {
-    return this.paymentRepository.findById(id);
+  async findById(id: string, userId: string) {
+    const payment = await this.paymentRepository.findById(id);
+    if (payment && payment.userId !== userId) {
+      throw new ForbiddenError("Acesso negado", ErrorCodes.FORBIDDEN);
+    }
+    return payment;
   }
 }

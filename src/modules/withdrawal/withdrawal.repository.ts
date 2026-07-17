@@ -13,6 +13,23 @@ export class WithdrawalRepository implements IWithdrawalRepository {
     return this.prisma.withdrawal.create({ data, include: withdrawalInclude });
   }
 
+  async reserveBalanceAndCreate(data: CreateWithdrawalData) {
+    return this.prisma.$transaction(async (tx) => {
+      const reserved = await tx.cause.updateMany({
+        where: {
+          id: data.causeId,
+          authorId: data.userId,
+          balance: { gte: data.amount },
+        },
+        data: { balance: { decrement: data.amount } },
+      });
+
+      if (reserved.count !== 1) return null;
+
+      return tx.withdrawal.create({ data, include: withdrawalInclude });
+    });
+  }
+
   async findById(id: string) {
     return this.prisma.withdrawal.findUnique({ where: { id }, include: withdrawalInclude });
   }

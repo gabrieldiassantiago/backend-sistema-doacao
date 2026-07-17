@@ -25,24 +25,17 @@ export const checkPendingPayments = async () => {
 
         for (const payment of pendingPayments) {
             try {
-                await container.emailQueueService.enqueuePaymentFailed(
-                    payment.user.email,
-                    {
-                        userName: payment.user.name,
-                        causeTitle: payment.cause.title,
-                        amount: payment.amount,
-                    }
-                );
+                if (!payment.mpPaymentId) continue;
 
-                await prisma.payment.update({
-                    where: { id: payment.id },
-                    data: { emailSent: true }
+                // O status é sempre confirmado no provedor. Um PIX que apenas
+                // continua pendente não deve gerar um falso e-mail de falha.
+                await container.paymentService.handleWebhook({
+                    type: 'payment',
+                    data: { id: payment.mpPaymentId },
                 });
-
-                console.log(`[CRON] Email enfileirado para o pagamento ${payment.id}`);
             } catch (emailError) {
                 // Se falhar o envio para um, logamos o erro mas continuamos o loop para os outros
-                console.error(`❌ Erro ao enfileirar email para pagamento ${payment.id}:`, emailError);
+                console.error(`❌ Erro ao reconciliar pagamento ${payment.id}:`, emailError);
             }
         }
 

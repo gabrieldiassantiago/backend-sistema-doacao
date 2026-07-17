@@ -1,0 +1,84 @@
+@startuml Fluxo de Moderação de Causas
+' ═══════════════════════════════════════════════════════════════
+'  Fluxo de Moderação de Causas
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam SequenceMessageAlignment center
+
+skinparam participant {
+  BackgroundColor #FAFAFA
+  BorderColor #BDBDBD
+  FontStyle bold
+}
+
+skinparam sequence {
+  ArrowThickness 1.5
+  ArrowColor #555555
+  LifeLineBorderColor #CCCCCC
+  LifeLineBackgroundColor #F5F5F5
+  GroupBorderColor #7B1FA2
+  GroupBackgroundColor #F3E5F5
+  DividerBorderColor #CCCCCC
+}
+
+title **Fluxo de Moderação de Causas**
+
+actor "👤 Autor" as U
+actor "🛡 Admin" as A
+participant "⚡ API" as API #E3F2FD
+participant "☁️ S3\nStorage" as S3 #FFF9C4
+database "🐘 PostgreSQL" as DB #E8EAF6
+queue "📨 Email\nQueue" as Q #FFEBEE
+
+== 1. Criação da causa ==
+
+U -> API : POST /causes\n{ title, description, images[] }
+activate API
+API -> S3 : Upload imagens
+S3 --> API : imageKeys[]
+API -> DB : Cria Cause (status: ACTIVE)
+API --> U : causa criada
+deactivate API
+
+== 2. Envio de documentos ==
+
+U -> API : POST /causes/:id/documents\n{ file, docType }
+activate API
+API -> S3 : Upload documento
+S3 --> API : fileKey
+API -> DB : Cria CauseDocument\n(status: PENDING)
+API -> Q : 📧 "Causa em análise"
+API --> U : documento anexado
+deactivate API
+
+== 3. Revisão pelo admin ==
+
+A -> API : GET /causes/admin/pending
+activate API
+API -> DB : Lista causas pendentes
+API --> A : causas[]
+deactivate API
+
+A -> API : PATCH /causes/admin/documents/:docId/review\n{ status: "APPROVED" }
+activate API
+API -> DB : Atualiza CauseDocument
+API --> A : ok
+deactivate API
+
+== 4. Moderação final ==
+
+A -> API : PATCH /causes/admin/:id/moderate\n{ status: "ACTIVE", isVerified: true }
+activate API
+API -> DB : Atualiza Cause\n(isVerified = true)
+API -> Q : 📧 "Causa aprovada!"
+API --> A : causa moderada
+deactivate API
+
+Q --> U : 📧 Notificação por email
+
+@enduml

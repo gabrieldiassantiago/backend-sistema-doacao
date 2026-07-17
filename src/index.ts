@@ -20,6 +20,16 @@ export class AppBootstrapper {
   private app: any;
 
   async bootstrap(): Promise<void> {
+    const docsUser = process.env.DOCS_USERNAME;
+    const docsPassword = process.env.DOCS_PASSWORD;
+    const webhookUrl = process.env.MERCADO_PAGO_WEBHOOK_URL;
+
+    if (!docsUser || !docsPassword || !webhookUrl) {
+      throw new Error(
+        "DOCS_USERNAME, DOCS_PASSWORD e MERCADO_PAGO_WEBHOOK_URL devem ser configuradas",
+      );
+    }
+
     this.app = new Elysia()
 
       .use(cors({
@@ -55,10 +65,7 @@ export class AppBootstrapper {
         const decoded = Buffer.from(base64, "base64").toString("utf-8");
         const [username, password] = decoded.split(":");
 
-        const validUser = 'teste';
-        const validPass = 'teste';
-
-        if (username !== validUser || password !== validPass) {
+        if (username !== docsUser || password !== docsPassword) {
           set.status = 401;
           set.headers["WWW-Authenticate"] = 'Basic realm="Docs Privadas"';
           return "Usuário ou senha inválidos";

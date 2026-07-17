@@ -1,0 +1,235 @@
+@startuml Banco de Dados
+' ═══════════════════════════════════════════════════════════════
+'  Diagrama ER — Banco de Dados PostgreSQL
+'  Dividido em 3 zonas temáticas para clareza visual
+' ═══════════════════════════════════════════════════════════════
+
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam linetype ortho
+
+skinparam entity {
+  BackgroundColor #FAFAFA
+  BorderColor #BDBDBD
+  ArrowColor #757575
+}
+
+title **Diagrama Entidade-Relacionamento**
+
+' ════════════════════════════════════════
+'  ZONA 1 — IDENTIDADE
+' ════════════════════════════════════════
+
+entity "User" as user #E8F5E9;line:#4CAF50 {
+  * id : UUID <<PK>>
+  --
+  name : String
+  email : String <<UK>>
+  emailVerified : Boolean
+  image : String?
+  xpPoints : Int
+  balance : Float
+  isAdmin : Boolean
+  isAnonymous : Boolean
+}
+
+entity "Session" as session #E8F5E9;line:#4CAF50 {
+  * id : UUID <<PK>>
+  --
+  token : String <<UK>>
+  expiresAt : DateTime
+  ipAddress : String?
+  userAgent : String?
+  userId : UUID <<FK>>
+}
+
+entity "Account" as account #E8F5E9;line:#4CAF50 {
+  * id : String <<PK>>
+  --
+  accountId : String
+  providerId : String
+  userId : UUID <<FK>>
+  accessToken : String?
+  password : String?
+}
+
+entity "Verification" as verification #E8F5E9;line:#4CAF50 {
+  * id : UUID <<PK>>
+  --
+  identifier : String
+  value : String
+  expiresAt : DateTime
+}
+
+' ════════════════════════════════════════
+'  ZONA 2 — CAUSAS E DOAÇÕES
+' ════════════════════════════════════════
+
+entity "Category" as category #E3F2FD;line:#1976D2 {
+  * id : UUID <<PK>>
+  --
+  name : String <<UK>>
+  description : String?
+}
+
+entity "Cause" as cause #E3F2FD;line:#1976D2 {
+  * id : UUID <<PK>>
+  --
+  title : String
+  description : String
+  goalAmount : Float
+  raised : Float
+  balance : Float
+  status : String
+  isVerified : Boolean
+  isFeatured : Boolean
+  authorId : UUID <<FK>>
+  categoryId : UUID? <<FK>>
+  ..localização..
+  city : String?
+  state : String?
+  latitude : Float?
+  longitude : Float?
+}
+
+entity "CauseImage" as cause_image #E3F2FD;line:#1976D2 {
+  * id : UUID <<PK>>
+  --
+  causeId : UUID <<FK>>
+  key : String
+  position : Int
+}
+
+entity "CauseDocument" as cause_doc #E3F2FD;line:#1976D2 {
+  * id : UUID <<PK>>
+  --
+  causeId : UUID <<FK>>
+  fileKey : String
+  fileName : String
+  docType : DocType
+  status : DocStatus
+  rejectionReason : String?
+}
+
+entity "Donation" as donation #FFF3E0;line:#F57C00 {
+  * id : UUID <<PK>>
+  --
+  amount : Float
+  message : String?
+  xpEarned : Int
+  isAnonymous : Boolean
+  userId : UUID <<FK>>
+  causeId : UUID <<FK>>
+}
+
+entity "Payment" as payment #FFF3E0;line:#F57C00 {
+  * id : UUID <<PK>>
+  --
+  mpPaymentId : String? <<UK>>
+  status : PaymentStatus
+  amount : Float
+  payerEmail : String
+  qrCode : String?
+  qrCodeBase64 : String?
+  isAnonymous : Boolean
+  userId : UUID <<FK>>
+  causeId : UUID <<FK>>
+  donationId : String? <<FK>>
+}
+
+entity "UserBadge" as user_badge #FFF3E0;line:#F57C00 {
+  * id : UUID <<PK>>
+  --
+  userId : UUID <<FK>>
+  badgeKey : BadgeKey
+  earnedAt : DateTime
+}
+
+entity "Withdrawal" as withdrawal #FFF3E0;line:#F57C00 {
+  * id : UUID <<PK>>
+  --
+  causeId : UUID <<FK>>
+  userId : UUID <<FK>>
+  amount : Float
+  pixKey : String
+  status : WithdrawalStatus
+  mpTransferId : String?
+}
+
+' ════════════════════════════════════════
+'  ZONA 3 — COMUNIDADE
+' ════════════════════════════════════════
+
+entity "CollectionPoint" as cp #F3E5F5;line:#7B1FA2 {
+  * id : UUID <<PK>>
+  --
+  name : String
+  street : String
+  number : String
+  city : String
+  state : String
+  latitude : Float
+  longitude : Float
+  isActive : Boolean
+}
+
+entity "AcceptedItem" as accepted_item #F3E5F5;line:#7B1FA2 {
+  * id : UUID <<PK>>
+  --
+  name : String
+  collectionPointId : UUID <<FK>>
+}
+
+entity "Suggestion" as cp_suggestion #F3E5F5;line:#7B1FA2 {
+  * id : UUID <<PK>>
+  --
+  userId : UUID <<FK>>
+  name : String
+  city : String
+  state : String
+  latitude : Float
+  longitude : Float
+  suggestedItems : String[]
+  reason : String?
+  status : SuggestionStatus
+  adminNote : String?
+  approvedPointId : String?
+}
+
+entity "SuggestionImage" as suggestion_image #F3E5F5;line:#7B1FA2 {
+  * id : UUID <<PK>>
+  --
+  suggestionId : UUID <<FK>>
+  key : String
+  position : Int
+}
+
+' ════════════════════════════════════════
+'  RELACIONAMENTOS
+' ════════════════════════════════════════
+
+user ||--o{ session
+user ||--o{ account
+user ||--o{ cause
+user ||--o{ donation
+user ||--o{ payment
+user ||--o{ withdrawal
+user ||--o{ user_badge
+user ||--o{ cp_suggestion
+
+cause }o--o| category
+cause ||--o{ cause_image
+cause ||--o{ cause_doc
+cause ||--o{ donation
+cause ||--o{ payment
+cause ||--o{ withdrawal
+
+payment |o--o| donation
+
+cp ||--o{ accepted_item
+cp_suggestion ||--o{ suggestion_image
+
+@enduml

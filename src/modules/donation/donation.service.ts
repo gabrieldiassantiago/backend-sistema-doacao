@@ -89,7 +89,7 @@ export class DonationService implements IDonationService {
   }
 
   // Chamado pelo PaymentService após webhook do MP confirmar pagamento aprovado
-  async createFromPayment(payment: PaymentInput): Promise<DonationResult> {
+  async createFromPayment(payment: PaymentInput): Promise<DonationResult | null> {
     const stats = await this.donationRepository.getUserStats(payment.userId);
 
     const donationCountAfter = stats.donationCount + 1;
@@ -115,6 +115,8 @@ export class DonationService implements IDonationService {
       newBadgeKeys,
       payment.id,
     );
+
+    if (!donation) return null;
 
     const updatedUser = await this.userRepository.findById(payment.userId);
     const cause       = await this.causeRepository.findById(payment.causeId);
